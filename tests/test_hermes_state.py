@@ -4,6 +4,7 @@ import time
 import pytest
 from pathlib import Path
 
+import hermes_state
 from hermes_state import SessionDB
 
 
@@ -21,6 +22,31 @@ def db(tmp_path):
 # =========================================================================
 
 class TestSessionLifecycle:
+    def test_sqlite_store_works_without_trigram_tokenizer(self, tmp_path, monkeypatch):
+        """Old SQLite builds should keep the main session DB available."""
+        monkeypatch.setattr(
+            hermes_state,
+            "FTS_TRIGRAM_SQL",
+            """
+            CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts_trigram USING fts5(
+                content,
+                tokenize='missing_trigram_tokenizer'
+            );
+            """,
+        )
+
+        session_db = SessionDB(db_path=tmp_path / "old_sqlite_state.db")
+        try:
+            assert session_db._trigram_fts_available is False
+            session_db.create_session(session_id="s1", source="cli")
+            session_db.append_message("s1", role="user", content="记忆系统很好用")
+
+            results = session_db.search_messages("记忆系统")
+            assert len(results) == 1
+            assert results[0]["session_id"] == "s1"
+        finally:
+            session_db.close()
+
     def test_create_and_get_session(self, db):
         sid = db.create_session(
             session_id="s1",
@@ -2942,4 +2968,3 @@ class TestFTS5ToolCallMigration:
             assert version == 11
         finally:
             session_db.close()
-
