@@ -228,6 +228,10 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "gemini-3-flash-preview",
         "gemini-3.1-flash-lite-preview",
     ],
+    "harbor": [
+        "claude-sonnet-4.6",
+        "claude-opus-4.7",
+    ],
     "google-gemini-cli": [
         "gemini-3.1-pro-preview",
         "gemini-3-pro-preview",
@@ -926,6 +930,7 @@ CANONICAL_PROVIDERS: list[ProviderEntry] = [
     ProviderEntry("openrouter",     "OpenRouter",               "OpenRouter (100+ models, pay-per-use)"),
     ProviderEntry("novita",         "NovitaAI",                 "NovitaAI (AI-native cloud: Model API, Agent Sandbox, GPU Cloud)"),
     ProviderEntry("lmstudio",       "LM Studio",                "LM Studio (local desktop app with built-in model server)"),
+    ProviderEntry("harbor",         "Harbor Engine",            "Harbor Engine (~/.hw credentials, Harbor-supported models)"),
     ProviderEntry("anthropic",      "Anthropic",                "Anthropic (Claude models — API key or Claude Code)"),
     ProviderEntry("openai-codex",   "OpenAI Codex",             "OpenAI Codex"),
     ProviderEntry("alibaba",        "Qwen Cloud",               "Qwen Cloud / DashScope Coding (Qwen + multi-provider)"),
@@ -983,6 +988,17 @@ _PROVIDER_LABELS = {p.slug: p.label for p in CANONICAL_PROVIDERS}
 _PROVIDER_LABELS["custom"] = "Custom endpoint"  # special case: not a named provider
 
 
+_HARBOR_VISIBLE_PROVIDER_SLUGS = {"harbor"}
+
+
+def visible_canonical_providers() -> list[ProviderEntry]:
+    """Return providers visible in the Harbor fork picker surfaces."""
+    show_all = os.getenv("HARBOR_SHOW_ALL_PROVIDERS", "").strip().lower()
+    if show_all in {"1", "true", "yes", "on"}:
+        return list(CANONICAL_PROVIDERS)
+    return [p for p in CANONICAL_PROVIDERS if p.slug in _HARBOR_VISIBLE_PROVIDER_SLUGS]
+
+
 _PROVIDER_ALIASES = {
     "glm": "zai",
     "z-ai": "zai",
@@ -1032,6 +1048,9 @@ _PROVIDER_ALIASES = {
     "qwen-portal": "qwen-oauth",
     "gemini-cli": "google-gemini-cli",
     "gemini-oauth": "google-gemini-cli",
+    "harbor-engine": "harbor",
+    "harborworks": "harbor",
+    "harbor-works": "harbor",
     "hf": "huggingface",
     "hugging-face": "huggingface",
     "huggingface-hub": "huggingface",
@@ -1625,8 +1644,8 @@ def list_available_providers() -> list[dict[str, str]]:
     Derives the provider list from :data:`CANONICAL_PROVIDERS` (single
     source of truth shared with ``hermes model``, ``/model``, etc.).
     """
-    # Derive display order from canonical list + custom
-    provider_order = [p.slug for p in CANONICAL_PROVIDERS] + ["custom"]
+    # Derive display order from the visible provider list.
+    provider_order = [p.slug for p in visible_canonical_providers()]
 
     # Build reverse alias map
     aliases_for: dict[str, list[str]] = {}
