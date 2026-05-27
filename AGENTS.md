@@ -1,5 +1,117 @@
 # Hermes Agent - Development Guide
 
+## Harbor Fork Overlay
+
+This checkout is the skinny Harbor fork of upstream `NousResearch/hermes-agent`.
+Keep Harbor changes small, isolated, and easy to replay on top of new upstream
+tags.
+
+### Harbor Mission
+
+Harbor uses this fork to ship managed Hermes agents that talk to Harbor Engine
+for model and web-tool traffic. Harbor-specific behavior should be limited to
+provider/auth/catalog/runtime integration needed for managed Harbor agents.
+
+Do not turn this fork into a broad Hermes rewrite. Prefer additive
+Harbor-named modules, narrow provider hooks, and small patches over editing
+large upstream flows.
+
+### Companion Repos
+
+- `~/code/harbor`: Harbor Works control plane, user/workspace/org contracts,
+  billing/admin surfaces, and long-lived `~/.hw` credential behavior.
+- `~/code/harbor-cli`: `hw` CLI and `~/.hw/credentials.json` profile storage.
+- `~/code/harbor-engine`: hosted model-routing service, Anthropic-compatible
+  endpoint, model catalog, usage metering, and web tool proxying.
+- `~/code/harbor-agents`: managed-agent runtime and VPS/Slack integration.
+
+### Startup Workflow
+
+1. Read `progress.md`, `feature_list.json`, the active feature file under
+   `agent_state/features/`, and the latest relevant handoff under
+   `agent_state/progress/`.
+2. Check `git status --short --branch` and preserve user changes.
+3. Inspect upstream implementation before editing. Prefer `rg` and `rg --files`.
+4. Keep each Harbor patch replayable against the latest upstream tag.
+5. Run focused checks while iterating, then run `./init.sh` before claiming the
+   fork harness is healthy.
+6. Update feature state and add a dated handoff with evidence, blockers, files
+   changed, and next steps.
+
+### Scope Rules
+
+- Work one feature at a time. The active feature is the file named by
+  `feature_list.json` unless the user explicitly changes priority.
+- Keep this fork focused on Harbor-specific Hermes integration: Harbor auth,
+  Harbor Engine routing, Harbor-supported catalog behavior, and managed-agent
+  runtime compatibility.
+- If a change belongs in `~/code/harbor`, `~/code/harbor-cli`,
+  `~/code/harbor-engine`, or `~/code/harbor-agents`, document the cross-repo
+  contract and stop at the boundary unless the user asks for multi-repo edits.
+- Do not close or mark a feature done just because code changed. The feature
+  must meet its done criteria and have verification evidence in
+  `agent_state/features/*.json` plus a dated handoff.
+
+### Versioning And Upstream Replay
+
+- Start every Harbor release from an upstream tag.
+- Harbor release tags use `<upstream-tag>.harbor<num>`, for example
+  `v2026.5.16.harbor1`.
+- When upstream ships a new tag, create a fresh Harbor branch from that tag,
+  replay the Harbor patch series, resolve conflicts in the smallest possible
+  way, rerun verification, then cut the next `.harbor<num>` tag.
+- Keep routine evidence out of root indexes. Use dated handoffs under
+  `agent_state/progress/`.
+
+See `docs/harbor-fork.md` for the replay checklist.
+
+### Harbor Auth And Engine Rules
+
+- Harbor managed mode uses the existing long-lived Harbor credential stored by
+  `hw` under `~/.hw/credentials.json` or named profiles under
+  `~/.hw/profiles/`.
+- Do not copy the Harbor token into `~/.hermes/.env`, `~/.hermes/config.yaml`,
+  repo files, tests, logs, or handoffs.
+- Do not introduce short-lived invocation credentials unless the product
+  direction changes.
+- Production-shaped Harbor model and web-tool traffic must route through Harbor
+  Engine. Do not bypass Engine with raw provider keys.
+- Local integration smoke should target `https://stage-engine.harborworks.ai`
+  using the token read from `~/.hw`.
+
+### Harbor Verification
+
+- Run `./init.sh` for harness sanity.
+- After touching Harbor Engine/provider/auth/catalog behavior, also run:
+
+```bash
+scripts/harbor-stage-engine-smoke.sh
+```
+
+The smoke script reads the token from `~/.hw/credentials.json` by default and
+does not print the token.
+
+### Definition Of Done
+
+- Harbor patch remains narrow and replayable on the recorded upstream tag.
+- The active feature state reflects status, scope, evidence, and next action.
+- Relevant local tests pass, including `./init.sh`.
+- Harbor Engine/provider/auth/catalog changes have stage Engine smoke evidence,
+  or the blocker is recorded with the exact command and failure.
+- No Harbor token, provider key, Slack secret, or customer secret is copied into
+  repo files, Hermes config, logs, or handoffs.
+- A dated handoff under `agent_state/progress/` leaves the next session
+  restartable.
+
+### End Of Session
+
+- Run the relevant verification commands and record exact evidence.
+- Update the active feature file before handing work back.
+- Add a dated handoff with files changed, decisions, blockers, and the next
+  recommended step.
+- Keep root `progress.md` and `feature_list.json` stable unless adding a
+  feature or changing the state-file structure.
+
 Instructions for AI coding assistants and developers working on the hermes-agent codebase.
 
 ## Development Environment
