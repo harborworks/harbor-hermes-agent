@@ -184,6 +184,7 @@ def build_models_payload(
         probe_current_custom_provider=probe_current_custom_provider,
         excluded_providers=ctx.excluded_providers or [],
     )
+    rows = _filter_visible_rows(rows)
 
     moa_row = _moa_provider_row(ctx.current_provider)
     if moa_row is not None:
@@ -318,13 +319,13 @@ def _append_unconfigured_rows(
     the saved model so GUI pickers don't silently snap to some other provider.
     """
     from hermes_cli.auth import PROVIDER_REGISTRY
-    from hermes_cli.models import CANONICAL_PROVIDERS, _PROVIDER_LABELS
+    from hermes_cli.models import _PROVIDER_LABELS, visible_canonical_providers
 
     seen = {r["slug"].lower() for r in rows}
     cur = (ctx.current_provider or "").lower()
     cur_model = str(ctx.current_model or "").strip()
     extras: list[dict] = []
-    for entry in CANONICAL_PROVIDERS:
+    for entry in visible_canonical_providers():
         if entry.slug.lower() in seen:
             continue
         if current_only and entry.slug.lower() != cur:
@@ -452,6 +453,13 @@ def _raw_config_has_enabled_moa_preset() -> bool:
     }
     return any(key in moa for key in legacy_keys) and bool(moa.get("enabled", True))
 
+def _filter_visible_rows(rows: list[dict]) -> list[dict]:
+    """Hide non-Harbor providers from picker payloads in the Harbor fork."""
+    from hermes_cli.models import visible_canonical_providers
+
+    visible = {entry.slug for entry in visible_canonical_providers()}
+    return [row for row in rows if row.get("slug") in visible]
+
 
 def _apply_picker_hints(rows: list[dict]) -> None:
     """Add ``authenticated``/``auth_type``/``key_env``/``warning`` per row.
@@ -492,7 +500,7 @@ def _apply_picker_hints(rows: list[dict]) -> None:
 
 
 def _reorder_canonical(rows: list[dict]) -> list[dict]:
-    """Canonical slugs in ``CANONICAL_PROVIDERS`` declaration order;
+    """Canonical slugs in visible-provider declaration order;
     truly-custom rows last.
 
     Keys on slug membership, NOT ``is_user_defined`` — section 3 of
@@ -501,9 +509,9 @@ def _reorder_canonical(rows: list[dict]) -> list[dict]:
     canonical. Keying on the flag would silently demote canonical
     providers configured via the new keyed schema.
     """
-    from hermes_cli.models import CANONICAL_PROVIDERS
+    from hermes_cli.models import visible_canonical_providers
 
-    order = {e.slug: i for i, e in enumerate(CANONICAL_PROVIDERS)}
+    order = {e.slug: i for i, e in enumerate(visible_canonical_providers())}
     canon = sorted(
         (r for r in rows if r["slug"] in order),
         key=lambda r: order[r["slug"]],

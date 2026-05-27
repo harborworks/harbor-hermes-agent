@@ -85,6 +85,7 @@ NOUS_INVOKE_JWT_MIN_TTL_SECONDS = ACCESS_TOKEN_REFRESH_SKEW_SECONDS
 DEVICE_AUTH_POLL_INTERVAL_CAP_SECONDS = 1     # poll at most every 1s
 DEFAULT_CODEX_BASE_URL = "https://chatgpt.com/backend-api/codex"
 DEFAULT_XAI_OAUTH_BASE_URL = "https://api.x.ai/v1"
+DEFAULT_HARBOR_ENGINE_BASE_URL = "https://engine.harborworks.ai/anthropic"
 MINIMAX_OAUTH_CLIENT_ID = "78257093-7e40-4613-99e0-527b14b39113"
 MINIMAX_OAUTH_SCOPE = "group_id profile model.completion"
 MINIMAX_OAUTH_GRANT_TYPE = "urn:ietf:params:oauth:grant-type:user_code"
@@ -208,6 +209,14 @@ PROVIDER_REGISTRY: Dict[str, ProviderConfig] = {
         name="Qwen OAuth",
         auth_type="oauth_external",
         inference_base_url=DEFAULT_QWEN_BASE_URL,
+    ),
+    "harbor": ProviderConfig(
+        id="harbor",
+        name="Harbor Engine",
+        auth_type="api_key",
+        inference_base_url=DEFAULT_HARBOR_ENGINE_BASE_URL,
+        api_key_env_vars=("HARBOR_ENGINE_TOKEN",),
+        base_url_env_var="HARBOR_ENGINE_BASE_URL",
     ),
     "lmstudio": ProviderConfig(
         id="lmstudio",
@@ -565,6 +574,44 @@ def has_usable_secret(value: Any, *, min_length: int = 4) -> bool:
     return True
 
 
+def _normalize_harbor_engine_base_url(base_url: str) -> str:
+    """Return the Anthropic-compatible Harbor Engine base URL."""
+    normalized = (base_url or DEFAULT_HARBOR_ENGINE_BASE_URL).strip().rstrip("/")
+    if normalized.endswith("/anthropic"):
+        return normalized
+    return f"{normalized}/anthropic"
+
+
+def _harbor_hw_credentials_path() -> Path:
+    """Resolve the Harbor CLI credentials file Hermes should read."""
+    explicit = os.getenv("HARBOR_HW_CREDENTIALS", "").strip()
+    if explicit:
+        return Path(explicit).expanduser()
+
+    profile = os.getenv("HARBOR_HW_PROFILE", "").strip()
+    if profile and profile != "default":
+        return Path.home() / ".hw" / "profiles" / f"{profile}.json"
+
+    return Path.home() / ".hw" / "credentials.json"
+
+
+def _resolve_harbor_hw_token() -> tuple[str, str]:
+    """Read the Harbor Works long-lived bearer token from ~/.hw."""
+    path = _harbor_hw_credentials_path()
+    try:
+        data = json.loads(path.read_text())
+    except FileNotFoundError:
+        return "", str(path)
+    except Exception as exc:
+        logger.warning("Could not read Harbor credentials from %s: %s", path, exc)
+        return "", str(path)
+
+    token = str(data.get("token") or "").strip()
+    if has_usable_secret(token):
+        return token, str(path)
+    return "", str(path)
+
+
 def _resolve_api_key_provider_secret(
     provider_id: str, pconfig: ProviderConfig
 ) -> tuple[str, str]:
@@ -582,6 +629,12 @@ def _resolve_api_key_provider_secret(
         except Exception:
             pass
         return "", ""
+
+    if provider_id == "harbor":
+        env_token = os.getenv("HARBOR_ENGINE_TOKEN", "").strip()
+        if has_usable_secret(env_token):
+            return env_token, "HARBOR_ENGINE_TOKEN"
+        return _resolve_harbor_hw_token()
 
     from hermes_cli.config import get_env_value_prefer_dotenv
     for env_var in pconfig.api_key_env_vars:
@@ -1774,6 +1827,7 @@ def resolve_provider(
         "github-copilot-acp": "copilot-acp", "copilot-acp-agent": "copilot-acp",
         "opencode": "opencode-zen", "zen": "opencode-zen",
         "qwen-portal": "qwen-oauth", "qwen-cli": "qwen-oauth", "qwen-oauth": "qwen-oauth",
+        "harbor-engine": "harbor", "harborworks": "harbor", "harbor-works": "harbor",
         "hf": "huggingface", "hugging-face": "huggingface", "huggingface-hub": "huggingface",
         "mimo": "xiaomi", "xiaomi-mimo": "xiaomi",
         "tencent": "tencent-tokenhub", "tokenhub": "tencent-tokenhub",
@@ -6359,7 +6413,9 @@ def get_api_key_provider_status(provider_id: str) -> Dict[str, Any]:
     if pconfig.base_url_env_var:
         env_url = os.getenv(pconfig.base_url_env_var, "").strip()
 
-    if provider_id in {"kimi-coding", "kimi-coding-cn"}:
+    if provider_id == "harbor":
+        base_url = _normalize_harbor_engine_base_url(env_url or pconfig.inference_base_url)
+    elif provider_id in {"kimi-coding", "kimi-coding-cn"}:
         base_url = _resolve_kimi_base_url(api_key, pconfig.inference_base_url, env_url)
     elif env_url:
         base_url = env_url
@@ -6546,7 +6602,9 @@ def resolve_api_key_provider_credentials(provider_id: str) -> Dict[str, Any]:
     if pconfig.base_url_env_var:
         env_url = os.getenv(pconfig.base_url_env_var, "").strip()
 
-    if provider_id in {"kimi-coding", "kimi-coding-cn"}:
+    if provider_id == "harbor":
+        base_url = _normalize_harbor_engine_base_url(env_url or pconfig.inference_base_url)
+    elif provider_id in {"kimi-coding", "kimi-coding-cn"}:
         base_url = _resolve_kimi_base_url(api_key, pconfig.inference_base_url, env_url)
     elif provider_id == "zai":
         base_url = _resolve_zai_base_url(api_key, pconfig.inference_base_url, env_url)

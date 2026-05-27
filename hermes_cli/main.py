@@ -3170,6 +3170,7 @@ def select_provider_and_model(args=None):
         _PROVIDER_ALIASES,
         group_providers,
         provider_group_for_slug,
+        visible_canonical_providers,
     )
 
     provider_labels = dict(_PROVIDER_LABELS)  # derive from canonical list
@@ -3190,7 +3191,7 @@ def select_provider_and_model(args=None):
     # row ("Kimi / Moonshot ▸"); picking it opens a member sub-picker that
     # resolves back to a concrete slug, so the dispatch chain below is
     # unchanged. Custom providers and the trailing actions stay flat.
-    canonical_descs = {p.slug: p.tui_desc for p in CANONICAL_PROVIDERS}
+    canonical_descs = {p.slug: p.tui_desc for p in visible_canonical_providers()}
     # Honor ``model_catalog.excluded_providers`` so the CLI ``hermes model``
     # picker hides the same providers the gateway/TUI pickers do. A canonical
     # provider is hidden if its slug OR any of its aliases appears in the
@@ -12819,19 +12820,13 @@ def cmd_console(args):
 
 
 def _build_provider_choices() -> list[str]:
-    """Build the --provider choices list from CANONICAL_PROVIDERS + 'auto'."""
+    """Build the --provider choices list from visible providers + 'auto'."""
     try:
-        from hermes_cli.models import CANONICAL_PROVIDERS as _cp
-        return ["auto"] + [p.slug for p in _cp]
+        from hermes_cli.models import visible_canonical_providers as _visible
+        return ["auto"] + [p.slug for p in _visible()]
     except Exception:
         # Fallback: static list guarantees the CLI always works
-        return [
-            "auto", "openrouter", "nous", "openai-codex", "xai-oauth", "copilot-acp", "copilot",
-            "anthropic", "gemini", "vertex", "xai", "bedrock", "azure-foundry",
-            "ollama-cloud", "huggingface", "zai", "kimi-coding", "kimi-coding-cn",
-            "stepfun", "minimax", "minimax-cn", "kilocode", "novita", "xiaomi", "arcee",
-            "nvidia", "deepseek", "alibaba", "qwen-oauth", "opencode-zen", "opencode-go",
-        ]
+        return ["auto", "harbor"]
 
 
 # Top-level subcommands that argparse knows about WITHOUT running plugin

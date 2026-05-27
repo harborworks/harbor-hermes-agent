@@ -66,7 +66,7 @@ git cherry-pick <harbor-commit-1> <harbor-commit-2>
    smoke:
 
 ```bash
-scripts/harbor-stage-engine-smoke.sh
+scripts/harbor-engine-smoke.sh
 ```
 
 7. Record the exact evidence in a dated file under `agent_state/progress/`.
@@ -90,7 +90,7 @@ fixtures, test output, logs, or handoff files.
 The smoke script defaults to:
 
 ```text
-https://stage-engine.harborworks.ai
+https://engine.harborworks.ai
 ```
 
 It reads:
@@ -106,4 +106,4 @@ and sends a minimal Anthropic-compatible request to:
 ```
 
 Set `HARBOR_ENGINE_BASE_URL`, `HARBOR_HW_CREDENTIALS`, or
-`HARBOR_MODEL_PROXY_TOKEN` to override defaults for local debugging.
+`HARBOR_ENGINE_TOKEN` to override defaults for local debugging.

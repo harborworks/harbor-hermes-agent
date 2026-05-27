@@ -12,7 +12,7 @@ version is `v2026.5.16.harbor1`.
 - `AGENTS.md` now contains a Harbor fork overlay with auth, Engine, versioning,
   replay, and verification rules.
 - `docs/harbor-fork.md` documents the upstream tag replay workflow.
-- `scripts/harbor-stage-engine-smoke.sh` reads the long-lived Harbor token from
+- `scripts/harbor-engine-smoke.sh` reads the long-lived Harbor token from
   `~/.hw/credentials.json` and calls stage Engine without printing the token.
 - Created private GitHub repository `harborworks/harbor-hermes-agent`; local
   remotes are `origin` for Harbor and `upstream` for Nous.
@@ -21,7 +21,7 @@ version is `v2026.5.16.harbor1`.
 - Harness validation passed at 100/100.
 - `./init.sh` passed. It ran `bash -n init.sh` and
   `scripts/run_tests.sh tests/hermes_cli/test_config.py`, with 55 tests passed.
-- `scripts/harbor-stage-engine-smoke.sh` passed against
+- `scripts/harbor-engine-smoke.sh` passed against
   `https://stage-engine.harborworks.ai`; response model was
   `claude-sonnet-4.6` and answered `2 + 2 = 4`.
 
@@ -34,7 +34,7 @@ version is `v2026.5.16.harbor1`.
 - `agent_state/progress/2026-05-27-initial-handoff.md`
 - `init.sh`
 - `docs/harbor-fork.md`
-- `scripts/harbor-stage-engine-smoke.sh`
+- `scripts/harbor-engine-smoke.sh`
 - `CLAUDE.md`
 - `.cursor/rules/agents.mdc`
 

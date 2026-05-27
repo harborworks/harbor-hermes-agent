@@ -76,8 +76,9 @@ See `docs/harbor-fork.md` for the replay checklist.
   direction changes.
 - Production-shaped Harbor model and web-tool traffic must route through Harbor
   Engine. Do not bypass Engine with raw provider keys.
-- Local integration smoke should target `https://stage-engine.harborworks.ai`
-  using the token read from `~/.hw`.
+- Local integration smoke should target `https://engine.harborworks.ai` by
+  default using the token read from `~/.hw`. Override `HARBOR_ENGINE_BASE_URL`
+  when testing stage.
 
 ### Harbor Verification
 
@@ -85,7 +86,7 @@ See `docs/harbor-fork.md` for the replay checklist.
 - After touching Harbor Engine/provider/auth/catalog behavior, also run:
 
 ```bash
-scripts/harbor-stage-engine-smoke.sh
+scripts/harbor-engine-smoke.sh
 ```
 
 The smoke script reads the token from `~/.hw/credentials.json` by default and

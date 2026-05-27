@@ -36,7 +36,7 @@ Run:
 For Harbor Engine integration changes, also run:
 
 ```bash
-scripts/harbor-stage-engine-smoke.sh
+scripts/harbor-engine-smoke.sh
 ```
 
 Record any failure or environment blocker in a dated handoff.
