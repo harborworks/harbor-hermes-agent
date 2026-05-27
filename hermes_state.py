@@ -404,6 +404,7 @@ class SessionDB:
         self._write_count = 0
         self._fts_enabled = False
         self._fts_unavailable_warned = False
+        self._trigram_fts_available = True
         try:
             self._conn = sqlite3.connect(
                 str(self.db_path),
@@ -447,6 +448,7 @@ class SessionDB:
 
     def _warn_fts5_unavailable(self, exc: sqlite3.OperationalError) -> None:
         self._fts_enabled = False
+        self._trigram_fts_available = False
         if self._fts_unavailable_warned:
             return
         self._fts_unavailable_warned = True
@@ -717,6 +719,47 @@ class SessionDB:
                             "reconcile %s.%s: %s", table_name, col_name, exc,
                         )
 
+    def _ensure_trigram_fts(self, cursor: sqlite3.Cursor) -> bool:
+        """Create trigram FTS when SQLite supports it.
+
+        Older distro SQLite builds can include FTS5 but lack the newer
+        trigram tokenizer. That should not disable the primary session DB.
+        """
+        try:
+            cursor.execute("SELECT * FROM messages_fts_trigram LIMIT 0")
+            self._trigram_fts_available = True
+            return True
+        except sqlite3.OperationalError:
+            pass
+
+        try:
+            cursor.executescript(FTS_TRIGRAM_SQL)
+            self._trigram_fts_available = True
+            return True
+        except sqlite3.OperationalError as exc:
+            if "no such tokenizer" not in str(exc).lower():
+                raise
+            self._trigram_fts_available = False
+            logger.warning(
+                "SQLite trigram tokenizer unavailable; CJK substring search "
+                "will use LIKE fallback: %s",
+                exc,
+            )
+            for _trig in (
+                "messages_fts_trigram_insert",
+                "messages_fts_trigram_delete",
+                "messages_fts_trigram_update",
+            ):
+                try:
+                    cursor.execute(f"DROP TRIGGER IF EXISTS {_trig}")
+                except sqlite3.OperationalError:
+                    pass
+            try:
+                cursor.execute("DROP TABLE IF EXISTS messages_fts_trigram")
+            except sqlite3.OperationalError:
+                pass
+            return False
+
     def _init_schema(self):
         """Create tables and FTS if they don't exist, reconcile columns.
 
@@ -794,15 +837,11 @@ class SessionDB:
                         cursor, "messages_fts_trigram"
                     )
                     if _fts_trigram_exists is False:
-                        if self._ensure_fts_schema(
-                            cursor, "messages_fts_trigram", FTS_TRIGRAM_SQL
-                        ):
+                        if self._ensure_trigram_fts(cursor):
                             cursor.execute(
                                 "INSERT INTO messages_fts_trigram(rowid, content) "
                                 "SELECT id, content FROM messages WHERE content IS NOT NULL"
                             )
-                        else:
-                            fts_migrations_complete = False
                     elif _fts_trigram_exists is None:
                         fts_migrations_complete = False
                 else:
@@ -830,12 +869,11 @@ class SessionDB:
                     if fts5_available:
                         # Recreate virtual tables + triggers with the new inline-mode
                         # schema that indexes content || tool_name || tool_calls.
-                        if (
-                            self._ensure_fts_schema(cursor, "messages_fts", FTS_SQL)
-                            and self._ensure_fts_schema(
-                                cursor, "messages_fts_trigram", FTS_TRIGRAM_SQL
-                            )
-                        ):
+                        porter_ready = self._ensure_fts_schema(
+                            cursor, "messages_fts", FTS_SQL
+                        )
+                        trigram_ready = self._ensure_trigram_fts(cursor)
+                        if porter_ready:
                             # Backfill both indexes from every existing messages row.
                             cursor.execute(
                                 "INSERT INTO messages_fts(rowid, content) "
@@ -845,14 +883,15 @@ class SessionDB:
                                 "COALESCE(tool_calls, '') "
                                 "FROM messages"
                             )
-                            cursor.execute(
-                                "INSERT INTO messages_fts_trigram(rowid, content) "
-                                "SELECT id, "
-                                "COALESCE(content, '') || ' ' || "
-                                "COALESCE(tool_name, '') || ' ' || "
-                                "COALESCE(tool_calls, '') "
-                                "FROM messages"
-                            )
+                            if trigram_ready:
+                                cursor.execute(
+                                    "INSERT INTO messages_fts_trigram(rowid, content) "
+                                    "SELECT id, "
+                                    "COALESCE(content, '') || ' ' || "
+                                    "COALESCE(tool_name, '') || ' ' || "
+                                    "COALESCE(tool_calls, '') "
+                                    "FROM messages"
+                                )
                         else:
                             fts_migrations_complete = False
                 else:
@@ -895,9 +934,7 @@ class SessionDB:
             # to the main FTS table; if it cannot be created, CJK search falls
             # back to LIKE.
             if self._fts_enabled:
-                trigram_enabled = self._ensure_fts_schema(
-                    cursor, "messages_fts_trigram", FTS_TRIGRAM_SQL
-                )
+                trigram_enabled = self._ensure_trigram_fts(cursor)
                 if trigram_enabled and triggers_need_repair:
                     self._rebuild_fts_indexes(cursor)
 
@@ -2830,7 +2867,7 @@ class SessionDB:
                 self._count_cjk(t) < 3 for t in _tokens_for_check
             )
 
-            if cjk_count >= 3 and not _any_short_cjk:
+            if cjk_count >= 3 and not _any_short_cjk and self._trigram_fts_available:
                 # Trigram FTS5 path — quote each non-operator token to handle
                 # FTS5 special chars (%, *, etc.) while preserving boolean
                 # operators (AND, OR, NOT) for multi-term queries.
