@@ -218,6 +218,10 @@ class TestBackendSelection:
         "TOOL_GATEWAY_SCHEME",
         "TOOL_GATEWAY_USER_TOKEN",
         "TAVILY_API_KEY",
+        "TAVILY_BASE_URL",
+        "HARBOR_ENGINE_BASE_URL",
+        "HARBOR_ENGINE_TOKEN",
+        "HARBOR_HW_CREDENTIALS",
     )
 
     def setup_method(self):
@@ -313,6 +317,42 @@ class TestBackendSelection:
         with patch("tools.web_tools._load_web_config", return_value={}), \
              patch.dict(os.environ, {"TAVILY_API_KEY": "tvly-test"}):
             assert _get_backend() == "tavily"
+
+    def test_fallback_tavily_with_harbor_engine_credentials(self, tmp_path):
+        """Harbor Engine credentials make the Tavily-compatible backend available."""
+        credentials_path = tmp_path / "credentials.json"
+        credentials_path.write_text(json.dumps({"token": "hw-test-token"}))
+
+        from tools.web_tools import _get_backend
+
+        with patch("tools.web_tools._load_web_config", return_value={}), \
+             patch.dict(
+                 os.environ,
+                 {
+                     "HARBOR_ENGINE_BASE_URL": "https://stage-engine.harborworks.ai",
+                     "HARBOR_HW_CREDENTIALS": str(credentials_path),
+                 },
+             ):
+            assert _get_backend() == "tavily"
+
+    def test_search_backend_tavily_with_harbor_engine_credentials(self, tmp_path):
+        """web.search_backend=tavily remains active without TAVILY_API_KEY."""
+        credentials_path = tmp_path / "credentials.json"
+        credentials_path.write_text(json.dumps({"token": "hw-test-token"}))
+
+        from tools.web_tools import _get_search_backend
+
+        with patch(
+            "tools.web_tools._load_web_config",
+            return_value={"search_backend": "tavily"},
+        ), patch.dict(
+            os.environ,
+            {
+                "HARBOR_ENGINE_BASE_URL": "https://stage-engine.harborworks.ai",
+                "HARBOR_HW_CREDENTIALS": str(credentials_path),
+            },
+        ):
+            assert _get_search_backend() == "tavily"
 
     def test_fallback_tavily_beats_firecrawl_direct(self):
         """Tavily ranks above firecrawl in the explicit-credential block."""

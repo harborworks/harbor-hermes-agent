@@ -26,10 +26,82 @@ from __future__ import annotations
 import logging
 import os
 from typing import Any, Dict, List
+from urllib.parse import urlparse
 
 from agent.web_search_provider import WebSearchProvider
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_TAVILY_BASE_URL = "https://api.tavily.com"
+DEFAULT_HARBOR_ENGINE_BASE_URL = "https://engine.harborworks.ai"
+
+
+def _normalize_harbor_tool_base_url(base_url: str) -> str:
+    """Return the Harbor Engine root URL used by Tavily-compatible tool shims."""
+    normalized = (base_url or DEFAULT_HARBOR_ENGINE_BASE_URL).strip().rstrip("/")
+    if normalized.endswith("/anthropic"):
+        normalized = normalized[: -len("/anthropic")]
+    return normalized
+
+
+def _resolve_tavily_base_url() -> str:
+    """Resolve the Tavily-compatible base URL.
+
+    Harbor installs set HARBOR_ENGINE_BASE_URL instead of TAVILY_BASE_URL so
+    Hermes can keep using its existing Tavily web backend without storing a
+    duplicate Harbor token in ~/.hermes/.env.
+    """
+    explicit_tavily_base = os.getenv("TAVILY_BASE_URL", "").strip()
+    if explicit_tavily_base:
+        return explicit_tavily_base.rstrip("/")
+
+    harbor_base = os.getenv("HARBOR_ENGINE_BASE_URL", "").strip()
+    if harbor_base:
+        return _normalize_harbor_tool_base_url(harbor_base)
+
+    return DEFAULT_TAVILY_BASE_URL
+
+
+def _is_harbor_tool_base_url(base_url: str) -> bool:
+    """Return True when a Tavily-compatible URL points at Harbor Engine."""
+    normalized = base_url.rstrip("/")
+    harbor_env = os.getenv("HARBOR_ENGINE_BASE_URL", "").strip()
+    if harbor_env and normalized == _normalize_harbor_tool_base_url(harbor_env):
+        return True
+
+    try:
+        host = urlparse(normalized).hostname or ""
+    except Exception:
+        return False
+    return host in {"engine.harborworks.ai", "stage-engine.harborworks.ai"}
+
+
+def _resolve_harbor_engine_token() -> str:
+    """Resolve the Harbor bearer token from env or ~/.hw without persisting it."""
+    env_token = os.getenv("HARBOR_ENGINE_TOKEN", "").strip()
+    if env_token:
+        return env_token
+
+    try:
+        from hermes_cli.auth import _resolve_harbor_hw_token
+
+        token, _source = _resolve_harbor_hw_token()
+        return token
+    except Exception as exc:
+        logger.debug("Could not resolve Harbor Engine token for web tools: %s", exc)
+        return ""
+
+
+def _resolve_tavily_api_key(base_url: str) -> str:
+    """Resolve the secret used for Tavily-compatible requests."""
+    api_key = os.getenv("TAVILY_API_KEY", "").strip()
+    if api_key:
+        return api_key
+
+    if _is_harbor_tool_base_url(base_url):
+        return _resolve_harbor_engine_token()
+
+    return ""
 
 
 def _tavily_request(endpoint: str, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -41,16 +113,15 @@ def _tavily_request(endpoint: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     """
     import httpx
 
-    from agent.web_search_provider import get_provider_env
-
-    api_key = get_provider_env("TAVILY_API_KEY")
+    base_url = _resolve_tavily_base_url()
+    api_key = _resolve_tavily_api_key(base_url)
     if not api_key:
         raise ValueError(
             "TAVILY_API_KEY environment variable not set. "
-            "Get your API key at https://app.tavily.com/home"
+            "Get your API key at https://app.tavily.com/home, or configure "
+            "HARBOR_ENGINE_BASE_URL with ~/.hw credentials for Harbor Engine."
         )
 
-    base_url = get_provider_env("TAVILY_BASE_URL") or "https://api.tavily.com"
     payload = dict(payload)  # don't mutate caller's dict
     payload["api_key"] = api_key
     url = f"{base_url}/{endpoint.lstrip('/')}"
@@ -139,10 +210,9 @@ class TavilyWebSearchProvider(WebSearchProvider):
         return "Tavily"
 
     def is_available(self) -> bool:
-        """Return True when ``TAVILY_API_KEY`` is set to a non-empty value."""
-        from agent.web_search_provider import get_provider_env
-
-        return bool(get_provider_env("TAVILY_API_KEY"))
+        """Return True when Tavily or Harbor Engine credentials are available."""
+        base_url = _resolve_tavily_base_url()
+        return bool(_resolve_tavily_api_key(base_url))
 
     def supports_search(self) -> bool:
         return True

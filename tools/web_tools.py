@@ -63,6 +63,8 @@ from plugins.web.firecrawl.provider import (
 from plugins.web.tavily.provider import (  # noqa: F401 — backward-compat names
     _normalize_tavily_documents,
     _normalize_tavily_search_results,
+    _resolve_tavily_api_key,
+    _resolve_tavily_base_url,
     _tavily_request,
 )
 # Parallel + Exa clients re-exported for backward-compat with existing
@@ -239,7 +241,7 @@ def _get_backend() -> str:
     # with "no subscription" and the tool returns an error to the agent
     # without falling back). Free-tier backends trail the paid ones.
     backend_candidates = (
-        ("tavily", _has_env("TAVILY_API_KEY")),
+        ("tavily", _tavily_is_available()),
         ("exa", _has_env("EXA_API_KEY")),
         ("parallel", _has_env("PARALLEL_API_KEY")),
         ("firecrawl", _has_env("FIRECRAWL_API_KEY") or _has_env("FIRECRAWL_API_URL")),
@@ -332,7 +334,7 @@ def _is_backend_available(backend: str) -> bool:
     if backend == "firecrawl":
         return check_firecrawl_api_key()
     if backend == "tavily":
-        return _has_env("TAVILY_API_KEY")
+        return _tavily_is_available()
     if backend == "searxng":
         return _has_env("SEARXNG_URL")
     if backend == "brave-free":
@@ -364,6 +366,14 @@ def _ddgs_package_importable() -> bool:
         import ddgs  # noqa: F401
         return True
     except ImportError:
+        return False
+
+
+def _tavily_is_available() -> bool:
+    """Return True when Tavily or Harbor Engine credentials can satisfy Tavily."""
+    try:
+        return bool(_resolve_tavily_api_key(_resolve_tavily_base_url()))
+    except Exception:
         return False
 
 # ─── Firecrawl Client ────────────────────────────────────────────────────────
