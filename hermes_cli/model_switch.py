@@ -2175,6 +2175,17 @@ def list_authenticated_providers(
         _cp_has_creds = False
         if _cp_config and _cp_config.api_key_env_vars:
             _cp_has_creds = any(os.environ.get(ev) for ev in _cp_config.api_key_env_vars)
+        # Some API-key providers have custom credential discovery that is not
+        # expressible as a simple env-var check. Harbor Engine, for example,
+        # reads the long-lived Harbor Works credential from ~/.hw.
+        if not _cp_has_creds and _cp_config and getattr(_cp_config, "auth_type", "") == "api_key":
+            try:
+                from hermes_cli.auth import get_api_key_provider_status
+
+                _cp_status = get_api_key_provider_status(_cp.slug)
+                _cp_has_creds = bool(_cp_status.get("configured"))
+            except Exception:
+                pass
         # Also check auth store and credential pool
         if not _cp_has_creds:
             try:

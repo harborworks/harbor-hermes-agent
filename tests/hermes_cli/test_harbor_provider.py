@@ -130,6 +130,51 @@ def test_harbor_provider_surfaces_hide_other_providers(monkeypatch):
     assert [row["slug"] for row in payload["providers"]] == ["harbor"]
 
 
+def test_harbor_provider_picker_uses_hw_credentials(monkeypatch, tmp_path):
+    from hermes_cli.inventory import ConfigContext, build_models_payload
+
+    credentials_path = tmp_path / "credentials.json"
+    _write_hw_credentials(credentials_path)
+    monkeypatch.setenv("HARBOR_HW_CREDENTIALS", str(credentials_path))
+    monkeypatch.delenv("HARBOR_ENGINE_TOKEN", raising=False)
+    monkeypatch.delenv("HARBOR_SHOW_ALL_PROVIDERS", raising=False)
+
+    ctx = ConfigContext(
+        current_provider="harbor",
+        current_model="claude-sonnet-4.6",
+        current_base_url="",
+        user_providers={},
+        custom_providers=[],
+    )
+
+    payload = build_models_payload(ctx, max_models=50)
+
+    assert [row["slug"] for row in payload["providers"]] == ["harbor"]
+    assert payload["providers"][0]["models"] == [
+        "claude-sonnet-4.6",
+        "claude-opus-4.7",
+    ]
+
+
+def test_harbor_model_completion_hides_upstream_aliases(monkeypatch):
+    from hermes_cli.commands import SlashCommandCompleter
+    import hermes_cli.model_switch as ms
+
+    monkeypatch.delenv("HARBOR_SHOW_ALL_PROVIDERS", raising=False)
+    monkeypatch.setattr(ms, "_ensure_direct_aliases", lambda: None)
+    monkeypatch.setattr(ms, "DIRECT_ALIASES", {})
+
+    completions = list(SlashCommandCompleter()._model_completions("", ""))
+    names = [completion.text for completion in completions]
+    meta = {completion.text: completion.display_meta_text for completion in completions}
+
+    assert names == ["harbor", "claude-sonnet-4.6", "claude-opus-4.7"]
+    assert meta["harbor"] == "Harbor Engine"
+    assert "codex" not in names
+    assert "deepseek" not in names
+    assert "kimi" not in names
+
+
 def test_resolve_runtime_provider_harbor(monkeypatch, tmp_path):
     credentials_path = tmp_path / "credentials.json"
     _write_hw_credentials(credentials_path)
