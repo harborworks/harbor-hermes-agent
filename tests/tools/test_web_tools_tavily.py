@@ -23,6 +23,8 @@ class TestTavilyRequest:
         """No TAVILY_API_KEY → ValueError with guidance."""
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop("TAVILY_API_KEY", None)
+            os.environ.pop("HARBOR_ENGINE_BASE_URL", None)
+            os.environ.pop("HARBOR_ENGINE_TOKEN", None)
             from tools.web_tools import _tavily_request
             with pytest.raises(ValueError, match="TAVILY_API_KEY"):
                 _tavily_request("search", {"query": "test"})
@@ -44,6 +46,56 @@ class TestTavilyRequest:
                 assert payload["api_key"] == "tvly-test-key"
                 assert payload["query"] == "hello"
                 assert "api.tavily.com/search" in call_kwargs.args[0]
+
+    def test_harbor_engine_base_url_uses_hw_token(self, tmp_path, monkeypatch):
+        """Harbor installs route Tavily-compatible calls through Engine auth."""
+        credentials_path = tmp_path / "credentials.json"
+        credentials_path.write_text(json.dumps({"token": "hw-harbor-token"}))
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"results": []}
+        mock_response.raise_for_status = MagicMock()
+
+        monkeypatch.setenv("HARBOR_HW_CREDENTIALS", str(credentials_path))
+        monkeypatch.setenv("HARBOR_ENGINE_BASE_URL", "https://stage-engine.harborworks.ai")
+        monkeypatch.delenv("TAVILY_BASE_URL", raising=False)
+        monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+        monkeypatch.delenv("HARBOR_ENGINE_TOKEN", raising=False)
+
+        with patch("tools.web_tools.httpx.post", return_value=mock_response) as mock_post:
+            from tools.web_tools import _tavily_request
+
+            _tavily_request("search", {"query": "hello"})
+
+        call_args = mock_post.call_args
+        payload = call_args.kwargs.get("json") or call_args[1].get("json")
+        assert call_args.args[0] == "https://stage-engine.harborworks.ai/search"
+        assert payload["api_key"] == "hw-harbor-token"
+
+    def test_harbor_engine_token_overrides_hw_file(self, tmp_path, monkeypatch):
+        """Explicit Harbor Engine env token wins but is not required."""
+        credentials_path = tmp_path / "credentials.json"
+        credentials_path.write_text(json.dumps({"token": "hw-file-token"}))
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"results": []}
+        mock_response.raise_for_status = MagicMock()
+
+        monkeypatch.setenv("HARBOR_HW_CREDENTIALS", str(credentials_path))
+        monkeypatch.setenv("HARBOR_ENGINE_BASE_URL", "https://engine.harborworks.ai/anthropic")
+        monkeypatch.setenv("HARBOR_ENGINE_TOKEN", "env-harbor-token")
+        monkeypatch.delenv("TAVILY_BASE_URL", raising=False)
+        monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+
+        with patch("tools.web_tools.httpx.post", return_value=mock_response) as mock_post:
+            from tools.web_tools import _tavily_request
+
+            _tavily_request("extract", {"urls": ["https://example.com"]})
+
+        call_args = mock_post.call_args
+        payload = call_args.kwargs.get("json") or call_args[1].get("json")
+        assert call_args.args[0] == "https://engine.harborworks.ai/extract"
+        assert payload["api_key"] == "env-harbor-token"
 
     def test_raises_on_http_error(self):
         """Non-2xx responses propagate as httpx.HTTPStatusError."""

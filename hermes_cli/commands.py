@@ -1536,6 +1536,39 @@ class SlashCommandCompleter(Completer):
                         display=name,
                         display_meta=f"{da.model} ({da.provider})",
                     )
+            try:
+                from hermes_cli.models import provider_model_ids, visible_canonical_providers
+
+                visible = list(visible_canonical_providers())
+            except Exception:
+                visible = []
+            if len(visible) == 1 and visible[0].slug == "harbor":
+                # Harbor's managed install intentionally exposes only the
+                # Harbor Engine provider and supported Harbor model IDs. Keep
+                # user-defined direct aliases above, but suppress upstream's
+                # broad built-in alias table so `/model ` doesn't advertise
+                # unsupported providers.
+                harbor_label = visible[0].label
+                if "harbor".startswith(sub_lower) and "harbor" != sub_lower:
+                    seen.add("harbor")
+                    yield Completion(
+                        "harbor",
+                        start_position=-len(sub_text),
+                        display="harbor",
+                        display_meta=harbor_label,
+                    )
+                for model_id in provider_model_ids("harbor"):
+                    if model_id in seen:
+                        continue
+                    if model_id.startswith(sub_lower) and model_id != sub_lower:
+                        seen.add(model_id)
+                        yield Completion(
+                            model_id,
+                            start_position=-len(sub_text),
+                            display=model_id,
+                            display_meta="harbor",
+                        )
+                return
             # Built-in catalog aliases not already covered
             for name in sorted(MODEL_ALIASES.keys()):
                 if name in seen:
