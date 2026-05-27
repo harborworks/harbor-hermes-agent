@@ -50,6 +50,7 @@
     "Added Harbor fork overlay to AGENTS.md.",
     "Added Harbor fork maintenance notes and stage Engine smoke script.",
     "Created private GitHub repository harborworks/harbor-hermes-agent on 2026-05-27 and configured it as origin; upstream NousResearch/hermes-agent is configured as upstream.",
+    "Opened PR #1 for review before tagging: https://github.com/harborworks/harbor-hermes-agent/pull/1.",
     "Harness validator reported 100/100 on 2026-05-27.",
     "./init.sh passed on 2026-05-27: bash -n init.sh and scripts/run_tests.sh tests/hermes_cli/test_config.py completed with 55 passed.",
     "scripts/harbor-stage-engine-smoke.sh passed on 2026-05-27 against https://stage-engine.harborworks.ai using ~/.hw/credentials.json; response model was claude-sonnet-4.6 and answered 2 + 2 = 4."

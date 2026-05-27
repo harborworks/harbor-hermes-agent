@@ -14,6 +14,8 @@
 - [x] Added Harbor fork harness, versioning/replay docs, and stage Engine smoke.
 - [x] Created private GitHub repository `harborworks/harbor-hermes-agent` and
   configured remotes.
+- [x] Opened PR #1 for review before tagging:
+  `https://github.com/harborworks/harbor-hermes-agent/pull/1`.
 - [x] Verified the harness and stage Engine smoke.
 
 ## Verification Evidence

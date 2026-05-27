@@ -16,6 +16,8 @@ version is `v2026.5.16.harbor1`.
   `~/.hw/credentials.json` and calls stage Engine without printing the token.
 - Created private GitHub repository `harborworks/harbor-hermes-agent`; local
   remotes are `origin` for Harbor and `upstream` for Nous.
+- Opened PR #1 for review before tagging:
+  `https://github.com/harborworks/harbor-hermes-agent/pull/1`.
 - Harness validation passed at 100/100.
 - `./init.sh` passed. It ran `bash -n init.sh` and
   `scripts/run_tests.sh tests/hermes_cli/test_config.py`, with 55 tests passed.
