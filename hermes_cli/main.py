@@ -11856,6 +11856,18 @@ def cmd_logs(args):
         since=getattr(args, "since", None),
         component=getattr(args, "component", None),
     )
+
+
+def _build_provider_choices() -> list[str]:
+    """Build the --provider choices list from visible providers + 'auto'."""
+    try:
+        from hermes_cli.models import visible_canonical_providers as _visible
+        return ["auto"] + [p.slug for p in _visible()]
+    except Exception:
+        # Fallback: static list guarantees the CLI always works
+        return ["auto", "harbor", "openai-codex"]
+
+
 # Top-level subcommands that argparse knows about WITHOUT running plugin
 # discovery.  Used to short-circuit eager plugin imports (which can take
 # 500ms+ pulling in google.cloud.pubsub_v1, aiohttp, grpc, etc.) when the

@@ -122,9 +122,8 @@ def build_models_payload(
     needs from a single substrate call.
 
     Flags:
-    - ``include_unconfigured``: append ``CANONICAL_PROVIDERS`` rows that
-      ``list_authenticated_providers`` didn't emit (TUI uses this to show
-      the full provider universe in the picker).
+    - ``include_unconfigured``: append visible canonical provider rows that
+      ``list_authenticated_providers`` didn't emit.
     - ``picker_hints``: add ``authenticated``/``auth_type``/``key_env``/
       ``warning`` per row (TUI ``ModelPickerDialog`` shape).
     - ``canonical_order``: reorder canonical-slug rows to
@@ -150,6 +149,7 @@ def build_models_payload(
         custom_providers=ctx.custom_providers,
         max_models=max_models,
     )
+    rows = _filter_visible_rows(rows)
 
     if include_unconfigured:
         rows = list(rows) + _append_unconfigured_rows(rows, ctx)
@@ -212,12 +212,12 @@ def _apply_capabilities(rows: list[dict]) -> None:
 
 def _append_unconfigured_rows(rows: list[dict], ctx: ConfigContext) -> list[dict]:
     """Build skeleton rows for canonical providers missing from ``rows``."""
-    from hermes_cli.models import CANONICAL_PROVIDERS, _PROVIDER_LABELS
+    from hermes_cli.models import _PROVIDER_LABELS, visible_canonical_providers
 
     seen = {r["slug"].lower() for r in rows}
     cur = (ctx.current_provider or "").lower()
     extras: list[dict] = []
-    for entry in CANONICAL_PROVIDERS:
+    for entry in visible_canonical_providers():
         if entry.slug.lower() in seen:
             continue
         extras.append(
@@ -232,6 +232,14 @@ def _append_unconfigured_rows(rows: list[dict], ctx: ConfigContext) -> list[dict
             }
         )
     return extras
+
+
+def _filter_visible_rows(rows: list[dict]) -> list[dict]:
+    """Hide non-Harbor providers from picker payloads in the Harbor fork."""
+    from hermes_cli.models import visible_canonical_providers
+
+    visible = {entry.slug for entry in visible_canonical_providers()}
+    return [row for row in rows if row.get("slug") in visible]
 
 
 def _apply_picker_hints(rows: list[dict]) -> None:
@@ -273,7 +281,7 @@ def _apply_picker_hints(rows: list[dict]) -> None:
 
 
 def _reorder_canonical(rows: list[dict]) -> list[dict]:
-    """Canonical slugs in ``CANONICAL_PROVIDERS`` declaration order;
+    """Canonical slugs in visible-provider declaration order;
     truly-custom rows last.
 
     Keys on slug membership, NOT ``is_user_defined`` — section 3 of
@@ -282,9 +290,9 @@ def _reorder_canonical(rows: list[dict]) -> list[dict]:
     canonical. Keying on the flag would silently demote canonical
     providers configured via the new keyed schema.
     """
-    from hermes_cli.models import CANONICAL_PROVIDERS
+    from hermes_cli.models import visible_canonical_providers
 
-    order = {e.slug: i for i, e in enumerate(CANONICAL_PROVIDERS)}
+    order = {e.slug: i for i, e in enumerate(visible_canonical_providers())}
     canon = sorted(
         (r for r in rows if r["slug"] in order),
         key=lambda r: order[r["slug"]],

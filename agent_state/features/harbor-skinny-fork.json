@@ -3,7 +3,7 @@
   "name": "Harbor skinny Hermes fork",
   "title": "Maintain a replayable Harbor fork of Hermes Agent",
   "description": "Keep a minimal Harbor patch series on top of upstream Hermes tags, starting from v2026.5.16, so managed Harbor agents can use Harbor Engine and ~/.hw credentials without broad upstream divergence.",
-  "status": "in_progress",
+  "status": "in_review",
   "priority": "p0",
   "base_upstream_tag": "v2026.5.16",
   "current_harbor_version": "v2026.5.16.harbor1",
@@ -53,7 +53,22 @@
     "Opened PR #1 for review before tagging: https://github.com/harborworks/harbor-hermes-agent/pull/1.",
     "Harness validator reported 100/100 on 2026-05-27.",
     "./init.sh passed on 2026-05-27: bash -n init.sh and scripts/run_tests.sh tests/hermes_cli/test_config.py completed with 55 passed.",
-    "scripts/harbor-stage-engine-smoke.sh passed on 2026-05-27 against https://stage-engine.harborworks.ai using ~/.hw/credentials.json; response model was claude-sonnet-4.6 and answered 2 + 2 = 4."
+    "scripts/harbor-engine-smoke.sh passed on 2026-05-27 against https://stage-engine.harborworks.ai using ~/.hw/credentials.json; response model was claude-sonnet-4.6 and answered 2 + 2 = 4.",
+    "Merged harness PR #1 into main on 2026-05-27 before starting code changes.",
+    "Added Harbor provider/auth/catalog patch on branch codex/harbor-provider-auth.",
+    "Harbor runtime provider reads ~/.hw credentials via /Users/jbencook/.hw/credentials.json by default, supports HARBOR_HW_PROFILE and HARBOR_HW_CREDENTIALS, and avoids reading ~/.hermes/.env for Harbor tokens.",
+    "Harbor provider catalog is limited to claude-sonnet-4.6 and claude-opus-4.7.",
+    "scripts/run_tests.sh tests/hermes_cli/test_harbor_provider.py tests/hermes_cli/test_runtime_provider_resolution.py tests/hermes_cli/test_api_key_providers.py passed on 2026-05-27 with 291 passed.",
+    "Hermes runtime smoke via resolve_runtime_provider(requested=\"harbor\") passed against https://stage-engine.harborworks.ai/anthropic/v1/messages on 2026-05-27 using ~/.hw credentials; response model was claude-sonnet-4.6 and answered 2 + 2 = 4.",
+    "./init.sh passed on 2026-05-27 after code changes: 55 passed.",
+    "Reviewed latest ~/code/harbor-engine origin/main at 88b413193c68c990b029cb3367219c4a68a3b44f on 2026-05-27; chat aliases are Sonnet and Opus only and prod Engine is the default target.",
+    "Renamed Harbor token override to HARBOR_ENGINE_TOKEN and removed old proxy naming from Harbor fork changes.",
+    "Changed default Harbor Engine base URL to https://engine.harborworks.ai/anthropic.",
+    "Hid non-Harbor providers from visible picker and inventory surfaces by default while retaining upstream provider registry code for explicit/debug use.",
+    "Renamed smoke script to scripts/harbor-engine-smoke.sh and made it fail on Harbor Engine error JSON responses.",
+    "scripts/run_tests.sh tests/hermes_cli/test_harbor_provider.py passed on 2026-05-27 with 9 passed after contract follow-up.",
+    "scripts/run_tests.sh tests/hermes_cli/test_harbor_provider.py tests/hermes_cli/test_runtime_provider_resolution.py tests/hermes_cli/test_api_key_providers.py passed on 2026-05-27 with 292 passed after contract follow-up.",
+    "HARBOR_ENGINE_BASE_URL=https://stage-engine.harborworks.ai scripts/harbor-engine-smoke.sh passed on 2026-05-27; prod-default smoke currently fails DNS resolution for engine.harborworks.ai while the prod host is being brought up."
   ],
-  "next_action": "Implement the smallest Harbor provider/auth/catalog patch on top of v2026.5.16.harbor1, then verify against stage-engine.harborworks.ai with ~/.hw credentials."
+  "next_action": "Review and merge the Harbor provider/auth/catalog PR. After merge, tag v2026.5.16.harbor1 and only then update harbor-agents install script to consume the tagged fork."
 }
