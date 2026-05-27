@@ -1,0 +1,15 @@
+{
+  "schema_version": 2,
+  "features_dir": "agent_state/features",
+  "notes": [
+    "This file is a stable index to reduce merge conflicts during parallel work.",
+    "Do not add routine evidence, next actions, or session notes here.",
+    "Feature details live in agent_state/features/*.json."
+  ],
+  "features": [
+    {
+      "id": "harbor-skinny-fork",
+      "file": "agent_state/features/harbor-skinny-fork.json"
+    }
+  ]
+}
