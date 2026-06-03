@@ -41,6 +41,7 @@ const https = require('node:https')
 const { spawn } = require('node:child_process')
 
 const STAMP_COMMIT_RE = /^[0-9a-f]{7,40}$/i
+const DEFAULT_INSTALL_REPO = 'harborworks/harbor-hermes-agent'
 
 // Stages flagged needs_user_input=true in the manifest are skipped by the
 // runner (passed -NonInteractive to install.ps1, which the install script
@@ -80,12 +81,17 @@ function cachedScriptPath(hermesHome, commit) {
   return path.join(bootstrapCacheDir(hermesHome), `install-${commit}.${process.platform === 'win32' ? 'ps1' : 'sh'}`)
 }
 
+function installScriptUrl(commit, scriptName = installScriptName()) {
+  const repo = String(process.env.HERMES_DESKTOP_INSTALL_REPO || DEFAULT_INSTALL_REPO).trim() || DEFAULT_INSTALL_REPO
+  return `https://raw.githubusercontent.com/${repo}/${commit}/scripts/${scriptName}`
+}
+
 function downloadInstallScript(commit, destPath) {
   // Fetch from GitHub raw at the pinned commit. The raw URL with a SHA
   // is immutable (unlike a branch ref), so we don't need integrity
   // verification beyond "did the file we wrote pass a syntax probe."
   const scriptName = installScriptName()
-  const url = `https://raw.githubusercontent.com/NousResearch/hermes-agent/${commit}/scripts/${scriptName}`
+  const url = installScriptUrl(commit, scriptName)
   return new Promise((resolve, reject) => {
     fs.mkdirSync(path.dirname(destPath), { recursive: true })
     const tmpPath = destPath + '.tmp'
@@ -587,5 +593,6 @@ module.exports = {
   // Exposed for testability
   parseStageResult,
   resolveLocalInstallScript,
+  installScriptUrl,
   cachedScriptPath
 }

@@ -1,7 +1,31 @@
 const assert = require('node:assert/strict')
 const test = require('node:test')
 
-const { runBootstrap } = require('./bootstrap-runner.cjs')
+const { installScriptUrl, runBootstrap } = require('./bootstrap-runner.cjs')
+
+test('installScriptUrl defaults to the Harbor fork for pinned bootstrap downloads', () => {
+  assert.equal(
+    installScriptUrl('a4f15e90086a', 'install.sh'),
+    'https://raw.githubusercontent.com/harborworks/harbor-hermes-agent/a4f15e90086a/scripts/install.sh'
+  )
+})
+
+test('installScriptUrl supports overriding the bootstrap source repository', () => {
+  const previous = process.env.HERMES_DESKTOP_INSTALL_REPO
+  process.env.HERMES_DESKTOP_INSTALL_REPO = 'example/fork'
+  try {
+    assert.equal(
+      installScriptUrl('a4f15e90086a', 'install.sh'),
+      'https://raw.githubusercontent.com/example/fork/a4f15e90086a/scripts/install.sh'
+    )
+  } finally {
+    if (previous === undefined) {
+      delete process.env.HERMES_DESKTOP_INSTALL_REPO
+    } else {
+      process.env.HERMES_DESKTOP_INSTALL_REPO = previous
+    }
+  }
+})
 
 test('runBootstrap bails immediately when the signal is already aborted', async () => {
   const controller = new AbortController()
