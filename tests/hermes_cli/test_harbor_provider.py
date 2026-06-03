@@ -98,7 +98,10 @@ def test_harbor_model_catalog_is_limited_to_supported_chat_models():
     ]
     assert get_default_model_for_provider("harbor") == "claude-sonnet-4.6"
     assert any(provider.slug == "harbor" for provider in CANONICAL_PROVIDERS)
-    assert [provider.slug for provider in visible_canonical_providers()] == ["harbor"]
+    assert [provider.slug for provider in visible_canonical_providers()] == [
+        "harbor",
+        "openai-codex",
+    ]
 
 
 def test_harbor_provider_surfaces_hide_other_providers(monkeypatch):
@@ -107,13 +110,17 @@ def test_harbor_provider_surfaces_hide_other_providers(monkeypatch):
 
     monkeypatch.delenv("HARBOR_SHOW_ALL_PROVIDERS", raising=False)
 
-    assert _build_provider_choices() == ["auto", "harbor"]
+    assert _build_provider_choices() == ["auto", "harbor", "openai-codex"]
     from hermes_cli.models import list_available_providers
 
-    assert [provider["id"] for provider in list_available_providers()] == ["harbor"]
+    assert [provider["id"] for provider in list_available_providers()] == [
+        "harbor",
+        "openai-codex",
+    ]
 
     rows = [
         {"slug": "harbor", "name": "Harbor Engine", "models": ["claude-sonnet-4.6"], "total_models": 1},
+        {"slug": "openai-codex", "name": "OpenAI Codex", "models": ["gpt-5.5"], "total_models": 1},
         {"slug": "openrouter", "name": "OpenRouter", "models": ["m"], "total_models": 1},
         {"slug": "custom:Ollama", "name": "Ollama", "models": ["m"], "total_models": 1},
     ]
@@ -127,7 +134,7 @@ def test_harbor_provider_surfaces_hide_other_providers(monkeypatch):
     with patch("hermes_cli.model_switch.list_authenticated_providers", return_value=rows):
         payload = build_models_payload(ctx, include_unconfigured=True, picker_hints=True, canonical_order=True)
 
-    assert [row["slug"] for row in payload["providers"]] == ["harbor"]
+    assert [row["slug"] for row in payload["providers"]] == ["harbor", "openai-codex"]
 
 
 def test_harbor_provider_picker_uses_hw_credentials(monkeypatch, tmp_path):
@@ -168,9 +175,15 @@ def test_harbor_model_completion_hides_upstream_aliases(monkeypatch):
     names = [completion.text for completion in completions]
     meta = {completion.text: completion.display_meta_text for completion in completions}
 
-    assert names == ["harbor", "claude-sonnet-4.6", "claude-opus-4.7"]
+    assert names[:4] == [
+        "harbor",
+        "claude-sonnet-4.6",
+        "claude-opus-4.7",
+        "openai-codex",
+    ]
+    assert "openai-codex" in names
+    assert "gpt-5.5" in names
     assert meta["harbor"] == "Harbor Engine"
-    assert "codex" not in names
     assert "deepseek" not in names
     assert "kimi" not in names
 

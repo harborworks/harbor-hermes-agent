@@ -1623,32 +1623,32 @@ class SlashCommandCompleter(Completer):
                 visible = list(visible_canonical_providers())
             except Exception:
                 visible = []
-            if len(visible) == 1 and visible[0].slug == "harbor":
-                # Harbor's managed install intentionally exposes only the
-                # Harbor Engine provider and supported Harbor model IDs. Keep
-                # user-defined direct aliases above, but suppress upstream's
-                # broad built-in alias table so `/model ` doesn't advertise
-                # unsupported providers.
-                harbor_label = visible[0].label
-                if "harbor".startswith(sub_lower) and "harbor" != sub_lower:
-                    seen.add("harbor")
-                    yield Completion(
-                        "harbor",
-                        start_position=-len(sub_text),
-                        display="harbor",
-                        display_meta=harbor_label,
-                    )
-                for model_id in provider_model_ids("harbor"):
-                    if model_id in seen:
-                        continue
-                    if model_id.startswith(sub_lower) and model_id != sub_lower:
-                        seen.add(model_id)
+            visible_slugs = {provider.slug for provider in visible}
+            if visible and visible_slugs.issubset({"harbor", "openai-codex"}):
+                # Harbor's managed install intentionally exposes only Harbor
+                # Engine plus Codex subscription routing. Keep user-defined
+                # direct aliases above, but suppress upstream's broad built-in
+                # alias table so `/model ` doesn't advertise unsupported providers.
+                for provider in visible:
+                    if provider.slug.startswith(sub_lower) and provider.slug != sub_lower:
+                        seen.add(provider.slug)
                         yield Completion(
-                            model_id,
+                            provider.slug,
                             start_position=-len(sub_text),
-                            display=model_id,
-                            display_meta="harbor",
+                            display=provider.slug,
+                            display_meta=provider.label,
                         )
+                    for model_id in provider_model_ids(provider.slug):
+                        if model_id in seen:
+                            continue
+                        if model_id.startswith(sub_lower) and model_id != sub_lower:
+                            seen.add(model_id)
+                            yield Completion(
+                                model_id,
+                                start_position=-len(sub_text),
+                                display=model_id,
+                                display_meta=provider.slug,
+                            )
                 return
             # Built-in catalog aliases not already covered
             for name in sorted(MODEL_ALIASES.keys()):
