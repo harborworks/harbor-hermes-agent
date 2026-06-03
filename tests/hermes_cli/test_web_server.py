@@ -3855,3 +3855,33 @@ class TestValidateProviderCredential:
         data = self._post("OPENAI_API_KEY", "   ").json()
         assert data["ok"] is False
 
+
+class TestHarborDesktopOAuthProviders:
+    """Harbor desktop should only expose Harbor Engine and Codex by default."""
+
+    @pytest.fixture(autouse=True)
+    def _setup_test_client(self, monkeypatch, _isolate_hermes_home):
+        try:
+            from starlette.testclient import TestClient
+        except ImportError:
+            pytest.skip("fastapi/starlette not installed")
+
+        from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
+
+        monkeypatch.delenv("HARBOR_SHOW_ALL_PROVIDERS", raising=False)
+        self.client = TestClient(app)
+        self.client.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
+
+    def test_oauth_provider_catalog_is_harbor_scoped_by_default(self):
+        data = self.client.get("/api/providers/oauth").json()
+        ids = [p["id"] for p in data["providers"]]
+
+        assert ids == ["harbor", "openai-codex"]
+        assert "nous" not in ids
+        assert "anthropic" not in ids
+
+    def test_hidden_provider_start_is_rejected_by_default(self):
+        response = self.client.post("/api/providers/oauth/nous/start", json={})
+
+        assert response.status_code == 400
+        assert "Unknown provider" in response.json()["detail"]

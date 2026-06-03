@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/input'
 import { getGlobalModelOptions } from '@/hermes'
 import {
   Check,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
@@ -53,63 +52,39 @@ interface ApiKeyOption {
   id: string
   name: string
   placeholder?: string
+  providerSlugs?: string[]
   short?: string
 }
 
 const MIN_KEY_LENGTH = 8
+const HARBOR_PROVIDER_ID = 'harbor'
+const CODEX_PROVIDER_ID = 'openai-codex'
+const VISIBLE_PROVIDER_IDS = new Set([HARBOR_PROVIDER_ID, CODEX_PROVIDER_ID])
+
+const HARBOR_EXTERNAL_PROVIDER: OAuthProvider = {
+  cli_command: 'hw auth login',
+  docs_url: 'https://harborworks.ai',
+  flow: 'external',
+  id: HARBOR_PROVIDER_ID,
+  name: 'Harbor Engine',
+  status: { logged_in: false }
+}
 
 const API_KEY_OPTIONS: ApiKeyOption[] = [
   {
-    id: 'openrouter',
-    name: 'OpenRouter',
-    short: 'one key, many models',
-    envKey: 'OPENROUTER_API_KEY',
-    description: 'Hosts hundreds of models behind a single key. Good default for new installs.',
-    docsUrl: 'https://openrouter.ai/keys'
-  },
-  {
-    id: 'openai',
-    name: 'OpenAI',
-    short: 'GPT-class models',
-    envKey: 'OPENAI_API_KEY',
-    description: 'Direct access to OpenAI models.',
-    docsUrl: 'https://platform.openai.com/api-keys'
-  },
-  {
-    id: 'gemini',
-    name: 'Google Gemini',
-    short: 'Gemini models',
-    envKey: 'GEMINI_API_KEY',
-    description: 'Direct access to Google Gemini models.',
-    docsUrl: 'https://aistudio.google.com/app/apikey'
-  },
-  {
-    id: 'xai',
-    name: 'xAI Grok',
-    short: 'Grok models',
-    envKey: 'XAI_API_KEY',
-    description: 'Direct access to xAI Grok models.',
-    docsUrl: 'https://console.x.ai/'
-  },
-  {
-    id: 'local',
-    name: 'Local / custom endpoint',
-    short: 'self-hosted',
-    envKey: 'OPENAI_BASE_URL',
-    description: 'Point Hermes at a local or self-hosted OpenAI-compatible endpoint (vLLM, llama.cpp, Ollama, etc).',
-    docsUrl: 'https://github.com/NousResearch/hermes-agent#bring-your-own-endpoint',
-    placeholder: 'http://127.0.0.1:8000/v1'
+    id: HARBOR_PROVIDER_ID,
+    name: 'Harbor Engine token',
+    short: 'Harbor Works',
+    envKey: 'HARBOR_ENGINE_TOKEN',
+    description: 'Use a Harbor Engine token directly, or sign in with the Harbor Works CLI instead.',
+    docsUrl: 'https://harborworks.ai',
+    providerSlugs: [HARBOR_PROVIDER_ID]
   }
 ]
 
 const PROVIDER_DISPLAY: Record<string, { order: number; title: string }> = {
-  nous: { order: 0, title: 'Nous Portal' },
-  anthropic: { order: 1, title: 'Anthropic Claude' },
-  'openai-codex': { order: 2, title: 'OpenAI Codex / ChatGPT' },
-  'minimax-oauth': { order: 3, title: 'MiniMax' },
-  'xai-oauth': { order: 4, title: 'xAI Grok' },
-  'claude-code': { order: 5, title: 'Claude Code' },
-  'qwen-oauth': { order: 6, title: 'Qwen Code' }
+  harbor: { order: 0, title: 'Harbor Engine' },
+  'openai-codex': { order: 1, title: 'OpenAI Codex / ChatGPT' }
 }
 
 const assetPath = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\/+/, '')}`
@@ -126,6 +101,14 @@ const orderOf = (p: OAuthProvider) => PROVIDER_DISPLAY[p.id]?.order ?? 99
 
 const sortProviders = (providers: OAuthProvider[]) =>
   [...providers].sort((a, b) => orderOf(a) - orderOf(b) || a.name.localeCompare(b.name))
+
+const visibleProviders = (providers: OAuthProvider[]) => {
+  const byId = new Map(providers.map(p => [p.id, p]))
+  const harbor = byId.get(HARBOR_PROVIDER_ID) ?? HARBOR_EXTERNAL_PROVIDER
+  const rest = providers.filter(p => p.id !== HARBOR_PROVIDER_ID && VISIBLE_PROVIDER_IDS.has(p.id))
+
+  return sortProviders([harbor, ...rest])
+}
 
 export function DesktopOnboardingOverlay({ enabled, onCompleted, requestGateway }: DesktopOnboardingOverlayProps) {
   const onboarding = useStore($desktopOnboarding)
@@ -235,9 +218,9 @@ function Header() {
           <Sparkles className="size-5" />
         </div>
         <div>
-          <h2 className="text-[0.9375rem] font-semibold tracking-tight">Let's get you setup with Hermes Agent</h2>
+          <h2 className="text-[0.9375rem] font-semibold tracking-tight">Let's get you setup with Harbor Hermes</h2>
           <p className="mt-1 max-w-xl text-[0.8125rem] leading-5 text-(--ui-text-tertiary)">
-            Connect a model provider to start chatting. Most options take one click.
+            Connect Harbor Engine or OpenAI Codex to start chatting.
           </p>
         </div>
       </div>
@@ -245,71 +228,33 @@ function Header() {
   )
 }
 
-const FEATURED_ID = 'nous'
-const FEATURED_PITCH = 'One subscription, 300+ frontier models — the recommended way to run Hermes'
-const SHOW_ALL_KEY = 'hermes-onboarding-show-all-v1'
-
-const readShowAll = () => {
-  try {
-    return window.localStorage.getItem(SHOW_ALL_KEY) === '1'
-  } catch {
-    return false
-  }
-}
-
-const persistShowAll = (value: boolean) => {
-  try {
-    window.localStorage.setItem(SHOW_ALL_KEY, value ? '1' : '0')
-  } catch {
-    // localStorage unavailable — degrade silently.
-  }
-
-  return value
-}
+const FEATURED_ID = HARBOR_PROVIDER_ID
+const FEATURED_PITCH = 'Use your Harbor Works credentials and route Hermes through Harbor Engine.'
 
 export function Picker({ ctx }: { ctx: OnboardingContext }) {
   const { mode, providers } = useStore($desktopOnboarding)
-  const [showAll, setShowAll] = useState(readShowAll)
-  const ordered = useMemo(() => (providers ? sortProviders(providers) : []), [providers])
+  const ordered = useMemo(() => (providers ? visibleProviders(providers) : []), [providers])
   const hasOauth = ordered.length > 0
-
-  if (mode === 'apikey' || !hasOauth) {
-    return <ApiKeyForm canGoBack={hasOauth} ctx={ctx} />
-  }
 
   if (providers === null) {
     return <Status>Looking up providers...</Status>
   }
 
+  if (mode === 'apikey' || !hasOauth) {
+    return <ApiKeyForm canGoBack={hasOauth} ctx={ctx} />
+  }
+
   const select = (p: OAuthProvider) => void startProviderOAuth(p, ctx)
   const featured = ordered.find(p => p.id === FEATURED_ID) ?? null
   const rest = featured ? ordered.filter(p => p.id !== FEATURED_ID) : ordered
-  // Collapse the secondary providers behind a disclosure only when Nous
-  // Portal is present to anchor the choice — otherwise show the full list.
-  const collapsible = Boolean(featured) && rest.length > 0
-  const showRest = !collapsible || showAll
 
   return (
     <div className="grid gap-2">
       {featured ? <FeaturedProviderRow onSelect={select} provider={featured} /> : null}
-      {showRest ? (
-        <>
-          {rest.map(p => (
-            <ProviderRow key={p.id} onSelect={select} provider={p} />
-          ))}
-          <KeyProviderRow onClick={() => setOnboardingMode('apikey')} />
-        </>
-      ) : null}
-      {collapsible ? (
-        <button
-          className="flex items-center justify-center gap-1.5 pt-1 text-xs font-medium text-muted-foreground transition hover:text-foreground"
-          onClick={() => setShowAll(persistShowAll(!showAll))}
-          type="button"
-        >
-          {showAll ? 'Collapse' : 'Other providers'}
-          <ChevronDown className={cn('size-3.5 transition', showAll && 'rotate-180')} />
-        </button>
-      ) : null}
+      {rest.map(p => (
+        <ProviderRow key={p.id} onSelect={select} provider={p} />
+      ))}
+      <KeyProviderRow onClick={() => setOnboardingMode('apikey')} />
       <div className="flex justify-end pt-1">
         <button
           className="text-xs font-medium text-muted-foreground hover:text-foreground"
@@ -378,8 +323,8 @@ function KeyProviderRow({ onClick }: { onClick: () => void }) {
       type="button"
     >
       <div className="min-w-0">
-        <span className="text-sm font-semibold">OpenRouter</span>
-        <p className="mt-1 text-xs leading-5 text-muted-foreground">One key, hundreds of models — a solid default</p>
+        <span className="text-sm font-semibold">Harbor Engine token</span>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">Paste a Harbor token instead of using CLI sign-in</p>
       </div>
       <ChevronRight className="size-4 text-muted-foreground transition group-hover:text-foreground" />
     </button>
@@ -427,7 +372,7 @@ function ApiKeyForm({ canGoBack, ctx }: { canGoBack: boolean; ctx: OnboardingCon
 
     setSaving(true)
     setError(null)
-    const result = await saveOnboardingApiKey(option.envKey, value, option.name, ctx)
+    const result = await saveOnboardingApiKey(option.envKey, value, option.name, ctx, option.providerSlugs)
 
     if (result.ok) {
       setValue('')

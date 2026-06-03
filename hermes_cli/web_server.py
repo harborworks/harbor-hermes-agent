@@ -3091,6 +3091,25 @@ def _claude_code_only_status() -> Dict[str, Any]:
     return {"logged_in": False, "source": None}
 
 
+def _harbor_engine_status() -> Dict[str, Any]:
+    """Surface Harbor Engine credentials in the desktop provider picker."""
+    try:
+        from hermes_cli.auth import get_auth_status
+
+        raw = get_auth_status("harbor")
+        return {
+            "logged_in": bool(raw.get("logged_in") or raw.get("configured")),
+            "source": "harbor_engine",
+            "source_label": raw.get("key_source") or "Harbor Works CLI",
+            "token_preview": None,
+            "expires_at": None,
+            "has_refresh_token": False,
+            "base_url": raw.get("base_url"),
+        }
+    except Exception as e:
+        return {"logged_in": False, "source": "harbor_engine", "error": str(e)}
+
+
 # Provider catalog. The order matters — it's how we render the UI list.
 # ``cli_command`` is what the dashboard surfaces as the copy-to-clipboard
 # fallback while Phase 2 (in-browser flows) isn't built yet.
@@ -3099,6 +3118,14 @@ def _claude_code_only_status() -> Dict[str, Any]:
 # show code + verification URL + poll, ``external`` = read-only (delegated
 # to a third-party CLI like Claude Code or Qwen).
 _OAUTH_PROVIDER_CATALOG: tuple[Dict[str, Any], ...] = (
+    {
+        "id": "harbor",
+        "name": "Harbor Engine",
+        "flow": "external",
+        "cli_command": "hw auth login",
+        "docs_url": "https://harborworks.ai",
+        "status_fn": _harbor_engine_status,
+    },
     {
         "id": "anthropic",
         "name": "Anthropic (Claude API)",
@@ -3164,6 +3191,20 @@ _OAUTH_PROVIDER_CATALOG: tuple[Dict[str, Any], ...] = (
         "status_fn": None,  # dispatched via auth.get_xai_oauth_auth_status
     },
 )
+
+
+_HARBOR_VISIBLE_OAUTH_PROVIDER_IDS = {"harbor", "openai-codex"}
+
+
+def _visible_oauth_provider_catalog() -> tuple[Dict[str, Any], ...]:
+    """Return provider picker entries visible in Harbor desktop builds."""
+    show_all = os.getenv("HARBOR_SHOW_ALL_PROVIDERS", "").strip().lower()
+    if show_all in {"1", "true", "yes", "on"}:
+        return _OAUTH_PROVIDER_CATALOG
+    return tuple(
+        p for p in _OAUTH_PROVIDER_CATALOG
+        if p["id"] in _HARBOR_VISIBLE_OAUTH_PROVIDER_IDS
+    )
 
 
 def _resolve_provider_status(provider_id: str, status_fn) -> Dict[str, Any]:
@@ -3254,7 +3295,7 @@ async def list_oauth_providers():
           has_refresh_token bool
     """
     providers = []
-    for p in _OAUTH_PROVIDER_CATALOG:
+    for p in _visible_oauth_provider_catalog():
         status = _resolve_provider_status(p["id"], p.get("status_fn"))
         providers.append({
             "id": p["id"],
@@ -3272,7 +3313,7 @@ async def disconnect_oauth_provider(provider_id: str, request: Request):
     """Disconnect an OAuth provider. Token-protected (matches /env/reveal)."""
     _require_token(request)
 
-    valid_ids = {p["id"] for p in _OAUTH_PROVIDER_CATALOG}
+    valid_ids = {p["id"] for p in _visible_oauth_provider_catalog()}
     if provider_id not in valid_ids:
         raise HTTPException(
             status_code=400,
@@ -4221,10 +4262,11 @@ async def start_oauth_login(provider_id: str, request: Request):
     """Initiate an OAuth login flow. Token-protected."""
     _require_token(request)
     _gc_oauth_sessions()
-    valid = {p["id"] for p in _OAUTH_PROVIDER_CATALOG}
+    catalog = _visible_oauth_provider_catalog()
+    valid = {p["id"] for p in catalog}
     if provider_id not in valid:
         raise HTTPException(status_code=400, detail=f"Unknown provider {provider_id}")
-    catalog_entry = next(p for p in _OAUTH_PROVIDER_CATALOG if p["id"] == provider_id)
+    catalog_entry = next(p for p in catalog if p["id"] == provider_id)
     if catalog_entry["flow"] == "external":
         raise HTTPException(
             status_code=400,

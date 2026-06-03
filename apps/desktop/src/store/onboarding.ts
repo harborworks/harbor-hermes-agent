@@ -172,7 +172,7 @@ function notifyGatewayTools(tools: string[] | undefined) {
   notify({
     durationMs: 8000,
     kind: 'info',
-    message: `${list} now run through your Nous subscription — no separate API keys needed.`,
+    message: `${list} now run through your connected provider — no separate API keys needed.`,
     title: 'Tool Gateway enabled'
   })
 }
@@ -609,7 +609,13 @@ export async function recheckExternalSignin(ctx: OnboardingContext) {
   )
 }
 
-export async function saveOnboardingApiKey(envKey: string, value: string, label: string, ctx: OnboardingContext) {
+export async function saveOnboardingApiKey(
+  envKey: string,
+  value: string,
+  label: string,
+  ctx: OnboardingContext,
+  preferredProviderSlugs?: string[]
+) {
   const trimmed = value.trim()
 
   if (!trimmed) {
@@ -639,7 +645,11 @@ export async function saveOnboardingApiKey(envKey: string, value: string, label:
     // env-key prefix stripped). Pass a couple of likely candidates;
     // fetchProviderDefaultModel falls back to the first authenticated
     // provider returned by /api/model/options if none match.
-    const slugCandidates = [envKey.replace(/_API_KEY$/, '').toLowerCase(), label.toLowerCase()]
+    const slugCandidates = [
+      ...(preferredProviderSlugs ?? []),
+      envKey.replace(/_API_KEY$/, '').toLowerCase(),
+      label.toLowerCase()
+    ]
     await completeWithModelConfirm(ctx, label, slugCandidates, reason => {
       stillFailing = true
       runtimeFailure = reason
