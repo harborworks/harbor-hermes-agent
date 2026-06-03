@@ -61,29 +61,29 @@ const HARBOR_PROVIDER_ID = 'harbor'
 const CODEX_PROVIDER_ID = 'openai-codex'
 const VISIBLE_PROVIDER_IDS = new Set([HARBOR_PROVIDER_ID, CODEX_PROVIDER_ID])
 
-const HARBOR_EXTERNAL_PROVIDER: OAuthProvider = {
-  cli_command: 'hw auth login',
+const HARBOR_WORKS_PROVIDER: OAuthProvider = {
+  cli_command: 'hw auth login --json',
   docs_url: 'https://harborworks.ai',
-  flow: 'external',
+  flow: 'device_code',
   id: HARBOR_PROVIDER_ID,
-  name: 'Harbor Engine',
+  name: 'Harbor Works',
   status: { logged_in: false }
 }
 
 const API_KEY_OPTIONS: ApiKeyOption[] = [
   {
     id: HARBOR_PROVIDER_ID,
-    name: 'Harbor Engine token',
+    name: 'Harbor Works token',
     short: 'Harbor Works',
     envKey: 'HARBOR_ENGINE_TOKEN',
-    description: 'Use a Harbor Engine token directly, or sign in with the Harbor Works CLI instead.',
+    description: 'Use a Harbor Works token directly, or sign in through the built-in flow instead.',
     docsUrl: 'https://harborworks.ai',
     providerSlugs: [HARBOR_PROVIDER_ID]
   }
 ]
 
 const PROVIDER_DISPLAY: Record<string, { order: number; title: string }> = {
-  harbor: { order: 0, title: 'Harbor Engine' },
+  harbor: { order: 0, title: 'Harbor Works' },
   'openai-codex': { order: 1, title: 'OpenAI Codex / ChatGPT' }
 }
 
@@ -104,7 +104,7 @@ const sortProviders = (providers: OAuthProvider[]) =>
 
 const visibleProviders = (providers: OAuthProvider[]) => {
   const byId = new Map(providers.map(p => [p.id, p]))
-  const harbor = byId.get(HARBOR_PROVIDER_ID) ?? HARBOR_EXTERNAL_PROVIDER
+  const harbor = byId.get(HARBOR_PROVIDER_ID) ?? HARBOR_WORKS_PROVIDER
   const rest = providers.filter(p => p.id !== HARBOR_PROVIDER_ID && VISIBLE_PROVIDER_IDS.has(p.id))
 
   return sortProviders([harbor, ...rest])
@@ -218,9 +218,9 @@ function Header() {
           <Sparkles className="size-5" />
         </div>
         <div>
-          <h2 className="text-[0.9375rem] font-semibold tracking-tight">Let's get you setup with Harbor Hermes</h2>
+          <h2 className="text-[0.9375rem] font-semibold tracking-tight">Let's set up Harbor Works Hermes</h2>
           <p className="mt-1 max-w-xl text-[0.8125rem] leading-5 text-(--ui-text-tertiary)">
-            Connect Harbor Engine or OpenAI Codex to start chatting.
+            Connect Harbor Works or OpenAI Codex to start chatting.
           </p>
         </div>
       </div>
@@ -229,7 +229,7 @@ function Header() {
 }
 
 const FEATURED_ID = HARBOR_PROVIDER_ID
-const FEATURED_PITCH = 'Use your Harbor Works credentials and route Hermes through Harbor Engine.'
+const FEATURED_PITCH = 'Sign in with Harbor Works and route Hermes through Harbor Works Engine.'
 
 export function Picker({ ctx }: { ctx: OnboardingContext }) {
   const { mode, providers } = useStore($desktopOnboarding)
@@ -323,8 +323,8 @@ function KeyProviderRow({ onClick }: { onClick: () => void }) {
       type="button"
     >
       <div className="min-w-0">
-        <span className="text-sm font-semibold">Harbor Engine token</span>
-        <p className="mt-1 text-xs leading-5 text-muted-foreground">Paste a Harbor token instead of using CLI sign-in</p>
+        <span className="text-sm font-semibold">Harbor Works token</span>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">Paste a token instead of using browser sign-in</p>
       </div>
       <ChevronRight className="size-4 text-muted-foreground transition group-hover:text-foreground" />
     </button>

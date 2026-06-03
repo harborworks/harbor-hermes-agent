@@ -3857,7 +3857,7 @@ class TestValidateProviderCredential:
 
 
 class TestHarborDesktopOAuthProviders:
-    """Harbor desktop should only expose Harbor Engine and Codex by default."""
+    """Harbor Works desktop should only expose Harbor Works and Codex by default."""
 
     @pytest.fixture(autouse=True)
     def _setup_test_client(self, monkeypatch, _isolate_hermes_home):
@@ -3877,6 +3877,8 @@ class TestHarborDesktopOAuthProviders:
         ids = [p["id"] for p in data["providers"]]
 
         assert ids == ["harbor", "openai-codex"]
+        assert data["providers"][0]["name"] == "Harbor Works"
+        assert data["providers"][0]["flow"] == "device_code"
         assert "nous" not in ids
         assert "anthropic" not in ids
 
@@ -3885,3 +3887,24 @@ class TestHarborDesktopOAuthProviders:
 
         assert response.status_code == 400
         assert "Unknown provider" in response.json()["detail"]
+
+    def test_harbor_start_uses_in_app_device_flow(self, monkeypatch):
+        from hermes_cli import web_server
+
+        def fake_worker(session_id):
+            with web_server._oauth_sessions_lock:
+                sess = web_server._oauth_sessions[session_id]
+                sess["user_code"] = "HW-123"
+                sess["verification_url"] = "https://platform.harborworks.ai/device/authorize?user_code=HW-123"
+                sess["expires_in"] = 600
+                sess["interval"] = 2
+
+        monkeypatch.setattr(web_server, "_harbor_works_auth_worker", fake_worker)
+
+        response = self.client.post("/api/providers/oauth/harbor/start", json={})
+        data = response.json()
+
+        assert response.status_code == 200
+        assert data["flow"] == "device_code"
+        assert data["user_code"] == "HW-123"
+        assert data["verification_url"].startswith("https://platform.harborworks.ai/")

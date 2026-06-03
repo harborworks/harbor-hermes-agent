@@ -20,6 +20,7 @@ import json
 import logging
 import os
 import secrets
+import shutil
 import stat
 import subprocess
 import sys
@@ -3091,15 +3092,15 @@ def _claude_code_only_status() -> Dict[str, Any]:
     return {"logged_in": False, "source": None}
 
 
-def _harbor_engine_status() -> Dict[str, Any]:
-    """Surface Harbor Engine credentials in the desktop provider picker."""
+def _harbor_works_status() -> Dict[str, Any]:
+    """Surface Harbor Works credentials in the desktop provider picker."""
     try:
         from hermes_cli.auth import get_auth_status
 
         raw = get_auth_status("harbor")
         return {
             "logged_in": bool(raw.get("logged_in") or raw.get("configured")),
-            "source": "harbor_engine",
+            "source": "harbor_works",
             "source_label": raw.get("key_source") or "Harbor Works CLI",
             "token_preview": None,
             "expires_at": None,
@@ -3107,7 +3108,7 @@ def _harbor_engine_status() -> Dict[str, Any]:
             "base_url": raw.get("base_url"),
         }
     except Exception as e:
-        return {"logged_in": False, "source": "harbor_engine", "error": str(e)}
+        return {"logged_in": False, "source": "harbor_works", "error": str(e)}
 
 
 # Provider catalog. The order matters — it's how we render the UI list.
@@ -3120,11 +3121,11 @@ def _harbor_engine_status() -> Dict[str, Any]:
 _OAUTH_PROVIDER_CATALOG: tuple[Dict[str, Any], ...] = (
     {
         "id": "harbor",
-        "name": "Harbor Engine",
-        "flow": "external",
-        "cli_command": "hw auth login",
+        "name": "Harbor Works",
+        "flow": "device_code",
+        "cli_command": "hw auth login --json",
         "docs_url": "https://harborworks.ai",
-        "status_fn": _harbor_engine_status,
+        "status_fn": _harbor_works_status,
     },
     {
         "id": "anthropic",
@@ -3368,8 +3369,8 @@ async def disconnect_oauth_provider(provider_id: str, request: Request):
 #          → persists to ~/.hermes/.anthropic_oauth.json AND credential pool
 #          → returns { ok: true, status: "approved" }
 #
-#   Device code (Nous, OpenAI Codex):
-#     1. POST /api/providers/oauth/{nous|openai-codex}/start
+#   Device code (Harbor Works, Nous, OpenAI Codex):
+#     1. POST /api/providers/oauth/{harbor|nous|openai-codex}/start
 #          → server hits provider's device-auth endpoint
 #          → gets { user_code, verification_url, device_code, interval, expires_in }
 #          → spawns background poller thread that polls the token endpoint
@@ -3444,6 +3445,241 @@ def _new_oauth_session(provider_id: str, flow: str) -> tuple[str, Dict[str, Any]
     with _oauth_sessions_lock:
         _oauth_sessions[sid] = sess
     return sid, sess
+
+
+_HARBOR_WORKS_INSTALL_URL = "https://download.harborworks.ai/install.sh"
+_HARBOR_WORKS_INSTALL_TIMEOUT_SECONDS = 180
+_HARBOR_WORKS_AUTH_START_TIMEOUT_SECONDS = 180
+
+
+def _harbor_works_hw_path() -> Path:
+    return Path.home() / ".hw" / "bin" / ("hw.exe" if os.name == "nt" else "hw")
+
+
+def _resolve_harbor_works_hw() -> Optional[Path]:
+    expected = _harbor_works_hw_path()
+    if expected.is_file() and os.access(expected, os.X_OK):
+        return expected
+
+    found = shutil.which("hw")
+    if found:
+        return Path(found)
+
+    return None
+
+
+def _install_harbor_works_hw() -> Path:
+    """Install the Harbor Works CLI to ~/.hw/bin using the official installer."""
+    expected = _harbor_works_hw_path()
+    install_dir = expected.parent
+    install_dir.mkdir(parents=True, exist_ok=True)
+
+    env = os.environ.copy()
+    env["HW_INSTALL_DIR"] = str(install_dir)
+
+    if os.name == "nt":
+        cmd = [
+            "powershell.exe",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            "iwr https://download.harborworks.ai/install.ps1 -UseB | iex",
+        ]
+    else:
+        cmd = ["/bin/bash", "-c", f"curl -fsSL {_HARBOR_WORKS_INSTALL_URL} | bash"]
+
+    try:
+        proc = subprocess.run(
+            cmd,
+            cwd=str(Path.home()),
+            env=env,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=_HARBOR_WORKS_INSTALL_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError("Harbor Works CLI install timed out.") from exc
+    except Exception as exc:
+        raise RuntimeError(f"Could not launch Harbor Works CLI installer: {exc}") from exc
+
+    if proc.returncode != 0:
+        output = (proc.stdout or "").strip()
+        detail = output.splitlines()[-1] if output else f"exit {proc.returncode}"
+        raise RuntimeError(f"Harbor Works CLI install failed: {detail}")
+
+    resolved = _resolve_harbor_works_hw()
+    if resolved is None:
+        raise RuntimeError(f"Harbor Works CLI installer completed but {expected} was not found.")
+    return resolved
+
+
+def _ensure_harbor_works_hw() -> Path:
+    return _resolve_harbor_works_hw() or _install_harbor_works_hw()
+
+
+def _harbor_works_auth_worker(session_id: str) -> None:
+    """Run `hw auth login --no-browser --json` and mirror events to the session."""
+
+    def _fail(message: str) -> None:
+        with _oauth_sessions_lock:
+            sess = _oauth_sessions.get(session_id)
+            if sess is not None:
+                sess["status"] = "error"
+                sess["error_message"] = message
+
+    try:
+        hw_path = _ensure_harbor_works_hw()
+    except Exception as exc:
+        _fail(str(exc))
+        return
+
+    env = os.environ.copy()
+    env["PATH"] = f"{hw_path.parent}{os.pathsep}{env.get('PATH', '')}"
+    cmd = [str(hw_path), "auth", "login", "--no-browser", "--json"]
+
+    try:
+        proc = subprocess.Popen(
+            cmd,
+            cwd=str(Path.home()),
+            env=env,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            bufsize=1,
+        )
+    except Exception as exc:
+        _fail(f"Could not start Harbor Works CLI auth: {exc}")
+        return
+
+    with _oauth_sessions_lock:
+        sess = _oauth_sessions.get(session_id)
+        if sess is None:
+            try:
+                proc.terminate()
+            except Exception:
+                pass
+            return
+        sess["process"] = proc
+        sess["hw_path"] = str(hw_path)
+
+    last_line = ""
+    try:
+        assert proc.stdout is not None
+        for raw_line in proc.stdout:
+            line = raw_line.strip()
+            if not line:
+                continue
+            last_line = line
+            try:
+                event = json.loads(line)
+            except Exception:
+                continue
+
+            status = str(event.get("status") or "")
+            if status == "authorization_started":
+                verification_url = str(event.get("verification_uri") or "")
+                user_code = str(event.get("user_code") or "")
+                if not verification_url or not user_code:
+                    continue
+                with _oauth_sessions_lock:
+                    sess = _oauth_sessions.get(session_id)
+                    if sess is None:
+                        try:
+                            proc.terminate()
+                        except Exception:
+                            pass
+                        return
+                    sess["user_code"] = user_code
+                    sess["verification_url"] = verification_url
+                    sess["expires_in"] = int(event.get("expires_in") or 600)
+                    sess["interval"] = max(1, int(event.get("interval") or 2))
+                    sess["expires_at"] = time.time() + int(sess["expires_in"])
+            elif status == "authorized":
+                with _oauth_sessions_lock:
+                    sess = _oauth_sessions.get(session_id)
+                    if sess is not None:
+                        sess["status"] = "approved"
+                        sess["api_base_url"] = event.get("api_base_url")
+                        sess["user_id"] = event.get("user_id") or event.get("customer_id")
+                        sess["workspace_id"] = event.get("workspace_id")
+                break
+
+        returncode = proc.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        try:
+            proc.terminate()
+        except Exception:
+            pass
+        returncode = proc.returncode
+    except Exception as exc:
+        _fail(f"Harbor Works auth failed: {exc}")
+        return
+    finally:
+        with _oauth_sessions_lock:
+            sess = _oauth_sessions.get(session_id)
+            if sess is not None:
+                sess.pop("process", None)
+
+    with _oauth_sessions_lock:
+        sess = _oauth_sessions.get(session_id)
+        if sess is None or sess.get("status") == "approved":
+            return
+        sess["status"] = "error"
+        message = "Harbor Works sign-in did not complete."
+        if returncode not in (None, 0):
+            message = f"Harbor Works CLI auth exited {returncode}."
+        if last_line:
+            message = f"{message} {last_line}"
+        sess["error_message"] = message
+
+
+async def _start_harbor_works_device_flow() -> Dict[str, Any]:
+    sid, _sess = _new_oauth_session("harbor", "device_code")
+    threading.Thread(
+        target=_harbor_works_auth_worker,
+        args=(sid,),
+        daemon=True,
+        name=f"oauth-harbor-{sid[:6]}",
+    ).start()
+
+    deadline = time.monotonic() + _HARBOR_WORKS_AUTH_START_TIMEOUT_SECONDS
+    while time.monotonic() < deadline:
+        with _oauth_sessions_lock:
+            sess = _oauth_sessions.get(sid)
+            snapshot = dict(sess) if sess else None
+        if snapshot is None:
+            raise HTTPException(status_code=404, detail="Session cancelled")
+        if snapshot.get("status") == "error":
+            raise HTTPException(
+                status_code=500,
+                detail=snapshot.get("error_message") or "Harbor Works auth failed",
+            )
+        if snapshot.get("user_code") and snapshot.get("verification_url"):
+            return {
+                "session_id": sid,
+                "flow": "device_code",
+                "user_code": snapshot["user_code"],
+                "verification_url": snapshot["verification_url"],
+                "expires_in": int(snapshot.get("expires_in") or 600),
+                "poll_interval": int(snapshot.get("interval") or 2),
+            }
+        await asyncio.sleep(0.1)
+
+    with _oauth_sessions_lock:
+        sess = _oauth_sessions.get(sid)
+        proc = sess.get("process") if sess else None
+        if sess is not None:
+            sess["status"] = "error"
+            sess["error_message"] = "Timed out waiting for Harbor Works CLI auth to start."
+    if proc is not None:
+        try:
+            proc.terminate()
+        except Exception:
+            pass
+    raise HTTPException(status_code=504, detail="Timed out waiting for Harbor Works CLI auth to start.")
 
 
 def _save_anthropic_oauth_creds(access_token: str, refresh_token: str, expires_at_ms: int) -> None:
@@ -3607,12 +3843,15 @@ def _submit_anthropic_pkce(session_id: str, code_input: str) -> Dict[str, Any]:
 
 
 async def _start_device_code_flow(provider_id: str) -> Dict[str, Any]:
-    """Initiate a device-code flow (Nous, OpenAI Codex, or MiniMax).
+    """Initiate a device-code flow (Harbor Works, Nous, OpenAI Codex, or MiniMax).
 
     Calls the provider's device-auth endpoint via the existing CLI helpers,
     then spawns a background poller. Returns the user-facing display fields
     so the UI can render the verification page link + user code.
     """
+    if provider_id == "harbor":
+        return await _start_harbor_works_device_flow()
+
     if provider_id == "nous":
         from hermes_cli.auth import (
             _request_device_code,
@@ -4342,6 +4581,12 @@ async def cancel_oauth_session(session_id: str, request: Request):
         sess = _oauth_sessions.pop(session_id, None)
     if sess is None:
         return {"ok": False, "message": "session not found"}
+    proc = sess.get("process")
+    if proc is not None:
+        try:
+            proc.terminate()
+        except Exception:
+            pass
     # Loopback sessions own a bound 127.0.0.1 callback server. Without an
     # explicit shutdown the worker would keep that port held until
     # _xai_wait_for_callback times out (up to 5 min). Free it immediately so
