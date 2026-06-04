@@ -1,20 +1,39 @@
-# Hermes Agent - Development Guide
+# Harbor Works Harness - Development Guide
 
-## Harbor Fork Overlay
+## Harbor Works Harness Overlay
 
-This checkout is the skinny Harbor fork of upstream `NousResearch/hermes-agent`.
-Keep Harbor changes small, isolated, and easy to replay on top of new upstream
-tags.
+This checkout is the Harbor Works Harness codebase. It started from upstream
+`NousResearch/hermes-agent`, but Harbor Works is now the product owner and
+source of truth. Treat upstream Hermes as an input stream to review, not as a
+base that must be replayed wholesale every release.
 
-### Harbor Mission
+The intended project/repo name is `harbor-works-harness`. Existing paths,
+package names, and historical files may still contain `hermes` or
+`harbor-hermes-agent` until an explicit rename task lands.
 
-Harbor uses this fork to ship managed Hermes agents that talk to Harbor Engine
-for model and web-tool traffic. Harbor-specific behavior should be limited to
-provider/auth/catalog/runtime integration needed for managed Harbor agents.
+### Harbor Works Mission
 
-Do not turn this fork into a broad Hermes rewrite. Prefer additive
-Harbor-named modules, narrow provider hooks, and small patches over editing
-large upstream flows.
+Harbor Works uses this codebase to ship managed agent harnesses that talk to
+Harbor Engine for model and web-tool traffic. Harbor Works behavior should be
+limited to the product surfaces, provider/auth/catalog/runtime integration, and
+managed-agent compatibility needed for Harbor Works users.
+
+Do not frame new product decisions as "Hermes with Harbor patches." Build the
+Harbor Works product deliberately, with small focused changes and clear
+handoffs. Keep inherited Hermes internals when they are still useful, but do
+not preserve upstream behavior merely because it is upstream.
+
+### Brand Naming Rules
+
+- User-facing product name: **Harbor Works**.
+- Harness/repo target name: `harbor-works-harness`.
+- Use **Harbor Works** in app names, setup flows, docs, user-visible errors,
+  PR descriptions, and handoffs when referring to the product.
+- Do not shorten the product to "Harbor" or "Works" in user-facing text.
+- Keep established technical names where they are proper nouns or identifiers:
+  `harborworks` GitHub org/domain, Harbor Engine, Harbor Works CLI, `hw`,
+  `~/.hw`, `HARBOR_*` environment variables, and existing file/package names
+  until a rename task explicitly changes them.
 
 ### Companion Repos
 
@@ -32,19 +51,35 @@ large upstream flows.
    `agent_state/progress/`.
 2. Check `git status --short --branch` and preserve user changes.
 3. Inspect upstream implementation before editing. Prefer `rg` and `rg --files`.
-4. Keep each Harbor patch replayable against the latest upstream tag.
+4. Check whether the task touches inherited Hermes behavior; if so, inspect the
+   relevant upstream code before editing.
 5. Run focused checks while iterating, then run `./init.sh` before claiming the
    fork harness is healthy.
 6. Update feature state and add a dated handoff with evidence, blockers, files
    changed, and next steps.
 
+### Parallel Worktree Protocol
+
+- After a PR merges, update local `main`, then create one worktree and one
+  `codex/<task-slug>` branch per independent task.
+- Each session owns exactly one worktree, branch, and feature/handoff file. Do
+  not edit another active session's `agent_state/features/<id>.json` or dated
+  handoff unless the user asks you to coordinate.
+- Keep root `feature_list.json` and `progress.md` stable. Only touch them when
+  adding a task, changing the active focus, or recording a merge-level state
+  transition.
+- Record session evidence in a dated file under `agent_state/progress/` before
+  yielding, especially when work is meant to be continued by another session.
+- Before opening or pushing a PR, rebase or merge the latest target branch if
+  the branch has drifted and rerun focused verification.
+
 ### Scope Rules
 
 - Work one feature at a time. The active feature is the file named by
   `feature_list.json` unless the user explicitly changes priority.
-- Keep this fork focused on Harbor-specific Hermes integration: Harbor auth,
-  Harbor Engine routing, Harbor-supported catalog behavior, and managed-agent
-  runtime compatibility.
+- Keep the codebase focused on Harbor Works agent harness behavior: Harbor
+  Works auth, Harbor Engine routing, Harbor Works-supported catalog behavior,
+  and managed-agent runtime compatibility.
 - If a change belongs in `~/code/harbor`, `~/code/harbor-cli`,
   `~/code/harbor-engine`, or `~/code/harbor-agents`, document the cross-repo
   contract and stop at the boundary unless the user asks for multi-repo edits.
@@ -52,18 +87,24 @@ large upstream flows.
   must meet its done criteria and have verification evidence in
   `agent_state/features/*.json` plus a dated handoff.
 
-### Versioning And Upstream Replay
+### Upstream Intake Policy
 
-- Start every Harbor release from an upstream tag.
-- Harbor release tags use `<upstream-tag>.harbor<num>`, for example
-  `v2026.5.16.harbor1`.
-- When upstream ships a new tag, create a fresh Harbor branch from that tag,
-  replay the Harbor patch series, resolve conflicts in the smallest possible
-  way, rerun verification, then cut the next `.harbor<num>` tag.
+- Do not automatically replay the Harbor Works patch series onto each upstream
+  Hermes release.
+- For every upstream Hermes release, assign an agent to review the release
+  notes, diff, and relevant tests, then decide which changes matter for
+  `harbor-works-harness`.
+- Port only relevant upstream fixes/features into Harbor Works-owned branches.
+  Security fixes, protocol compatibility, desktop stability, and provider/tool
+  behavior are usually higher signal than broad upstream product UX changes.
+- Record the review in a dated handoff: upstream version reviewed, accepted
+  changes, rejected/deferred changes, rationale, files touched, and verification.
+- If an upstream change is not relevant to Harbor Works, explicitly leave it
+  behind. That is an accepted outcome, not a merge failure.
 - Keep routine evidence out of root indexes. Use dated handoffs under
   `agent_state/progress/`.
 
-See `docs/harbor-fork.md` for the replay checklist.
+See `docs/harbor-fork.md` for the current upstream-intake checklist.
 
 ### Harbor Auth And Engine Rules
 
@@ -76,8 +117,9 @@ See `docs/harbor-fork.md` for the replay checklist.
   direction changes.
 - Production-shaped Harbor model and web-tool traffic must route through Harbor
   Engine. Do not bypass Engine with raw provider keys.
-- Local integration smoke should target `https://stage-engine.harborworks.ai`
-  using the token read from `~/.hw`.
+- Local integration smoke should target `https://engine.harborworks.ai` by
+  default using the token read from `~/.hw`. Override `HARBOR_ENGINE_BASE_URL`
+  when testing stage.
 
 ### Harbor Verification
 
@@ -85,7 +127,7 @@ See `docs/harbor-fork.md` for the replay checklist.
 - After touching Harbor Engine/provider/auth/catalog behavior, also run:
 
 ```bash
-scripts/harbor-stage-engine-smoke.sh
+scripts/harbor-engine-smoke.sh
 ```
 
 The smoke script reads the token from `~/.hw/credentials.json` by default and
@@ -93,7 +135,8 @@ does not print the token.
 
 ### Definition Of Done
 
-- Harbor patch remains narrow and replayable on the recorded upstream tag.
+- Harbor Works changes are product-owned, focused, and documented with upstream
+  intake rationale when inherited Hermes behavior is involved.
 - The active feature state reflects status, scope, evidence, and next action.
 - Relevant local tests pass, including `./init.sh`.
 - Harbor Engine/provider/auth/catalog changes have stage Engine smoke evidence,
@@ -113,6 +156,8 @@ does not print the token.
   feature or changing the state-file structure.
 
 Instructions for AI coding assistants and developers working on the hermes-agent codebase.
+
+**Never give up on the right solution.**
 
 ## Development Environment
 
@@ -159,8 +204,8 @@ hermes-agent/
 │   ├── hermes-achievements/  # Gamified achievement tracking
 │   ├── observability/    # Metrics / traces / logs plugin
 │   ├── image_gen/        # Image-generation providers
-│   └── <others>/         # disk-cleanup, example-dashboard, google_meet, platforms,
-│                         #   spotify, strike-freedom-cockpit, ...
+│   └── <others>/         # disk-cleanup, google_meet, platforms, spotify,
+│                         #   strike-freedom-cockpit, ...
 ├── optional-skills/      # Heavier/niche skills shipped but NOT active by default
 ├── skills/               # Built-in skills bundled with the repo
 ├── ui-tui/               # Ink (React) terminal UI — `hermes --tui`
@@ -177,6 +222,29 @@ hermes-agent/
 **Logs:** `~/.hermes/logs/` — `agent.log` (INFO+), `errors.log` (WARNING+),
 `gateway.log` when running the gateway. Profile-aware via `get_hermes_home()`.
 Browse with `hermes logs [--follow] [--level ...] [--session ...]`.
+
+## TypeScript Style
+
+Applies to TypeScript across Hermes: desktop, TUI, website, and future TS packages.
+
+- Prefer small nanostores over component state when state is shared, reused, or read by distant UI.
+- Let each feature own its atoms. Chat state belongs near chat, shell state near shell, shared state in `src/store`.
+- Components that render from an atom should use `useStore`. Non-rendering actions should read with `$atom.get()`.
+- Do not pass state through three components when the leaf can subscribe to the atom.
+- Keep persistence beside the atom that owns it.
+- Keep route roots thin. They compose routes and shell; they should not become controllers.
+- No monolithic hooks. A hook should own one narrow job.
+- Prefer colocated action modules over hidden god hooks.
+- If a callback is pure side effect, use the terse void form:
+  `onState={st => void setGatewayState(st)}`.
+- Async UI handlers should make intent explicit:
+  `onClick={() => void save()}`.
+- Prefer interfaces for public props and shared object shapes. Avoid `type X = { ... }` for object props.
+- Extend React primitives for props: `React.ComponentProps<'button'>`, `React.ComponentProps<typeof Dialog>`, `Omit<...>`, `Pick<...>`.
+- Table-driven beats condition ladders when mapping ids, routes, or views.
+- `src/app` owns routes, pages, and page-specific components.
+- `src/store` owns shared atoms.
+- `src/lib` owns shared pure helpers.
 
 ## File Dependency Chain
 
@@ -942,10 +1010,11 @@ kanban task.
   `unlink`, `comment`, `complete`, `block`, `unblock`, `archive`,
   `tail`, plus less-commonly-used `watch`, `stats`, `runs`, `log`,
   `assignees`, `heartbeat`, `notify-*`, `dispatch`, `daemon`, `gc`.
-- **Worker toolset:** `tools/kanban_tools.py` exposes `kanban_show`,
-  `kanban_complete`, `kanban_block`, `kanban_heartbeat`, `kanban_comment`,
-  `kanban_create`, `kanban_link` — gated by `HERMES_KANBAN_TASK` so
-  the schema only appears for processes actually running as a worker.
+- **Worker/orchestrator toolset:** `tools/kanban_tools.py` exposes
+  `kanban_show`, `kanban_complete`, `kanban_block`, `kanban_heartbeat`,
+  `kanban_comment`, `kanban_create`, `kanban_link`; profiles that
+  explicitly enable the `kanban` toolset outside a dispatcher-spawned
+  task also get `kanban_list` and `kanban_unblock` for board routing.
 - **Dispatcher:** long-lived loop that (default every 60s) reclaims
   stale claims, promotes ready tasks, atomically claims, and spawns
   assigned profiles. Runs **inside the gateway** by default via
@@ -961,8 +1030,9 @@ Isolation model:
 - **Tenant** is a soft namespace *within* a board — one specialist
   fleet can serve multiple businesses with workspace-path + memory-key
   isolation.
-- After ~5 consecutive spawn failures on the same task the dispatcher
-  auto-blocks it to prevent spin loops.
+- After `kanban.failure_limit` consecutive non-success attempts on the
+  same task (default: 2), the dispatcher auto-blocks it to prevent spin
+  loops.
 
 Full user-facing docs: `website/docs/user-guide/features/kanban.md`.
 
@@ -1123,16 +1193,38 @@ def profile_env(tmp_path, monkeypatch):
 
 **ALWAYS use `scripts/run_tests.sh`** — do not call `pytest` directly. The script enforces
 hermetic environment parity with CI (unset credential vars, TZ=UTC, LANG=C.UTF-8,
-4 xdist workers matching GHA ubuntu-latest). Direct `pytest` on a 16+ core
-developer machine with API keys set diverges from CI in ways that have caused
-multiple "works locally, fails in CI" incidents (and the reverse).
+`-n auto` xdist workers, in-tree subprocess-isolation plugin). Direct `pytest`
+on a 16+ core developer machine with API keys set diverges from CI in ways
+that have caused multiple "works locally, fails in CI" incidents (and the reverse).
 
 ```bash
 scripts/run_tests.sh                                  # full suite, CI-parity
 scripts/run_tests.sh tests/gateway/                   # one directory
 scripts/run_tests.sh tests/agent/test_foo.py::test_x  # one test
 scripts/run_tests.sh -v --tb=long                     # pass-through pytest flags
+scripts/run_tests.sh --no-isolate tests/foo/          # disable subprocess isolation (faster, for debugging)
 ```
+
+### Subprocess-per-test isolation
+
+Every test runs in a freshly-spawned Python subprocess via the in-tree plugin
+at `tests/_isolate_plugin.py`. This means module-level dicts/sets and
+ContextVars from one test cannot leak into the next — the historic
+`_reset_module_state` autouse fixture is gone.
+
+Implementation notes:
+
+- The plugin uses `multiprocessing.get_context("spawn")`, which works on
+  Linux, macOS, and Windows alike (POSIX `fork` is not used).
+- Per-test overhead is ~0.5–1.0s (Python startup + pytest collection). xdist
+  parallelism amortizes this across cores; on a 20-core box the full suite
+  finishes in roughly the same wall time as before, but flake-free.
+- `isolate_timeout` (configured in `pyproject.toml`) caps each test at 30s.
+  Hangs are killed and surfaced as a failure report.
+- Pass `--no-isolate` to disable isolation — useful when debugging a single
+  test interactively, or when you specifically want to verify state leakage.
+- The plugin disables itself in child processes (sentinel envvar
+  `HERMES_ISOLATE_CHILD=1`), so there's no fork-bomb risk.
 
 ### Why the wrapper (and why the old "just call pytest" doesn't work)
 
@@ -1144,7 +1236,7 @@ Five real sources of local-vs-CI drift the script closes:
 | HOME / `~/.hermes/` | Your real config+auth.json | Temp dir per test |
 | Timezone | Local TZ (PDT etc.) | UTC |
 | Locale | Whatever is set | C.UTF-8 |
-| xdist workers | `-n auto` = all cores (20+ on a workstation) | `-n 4` matching CI |
+| xdist workers | `-n auto` = all cores | `-n auto` (safe — subprocess isolation prevents cross-worker flakes) |
 
 `tests/conftest.py` also enforces points 1-4 as an autouse fixture so ANY pytest
 invocation (including IDE integrations) gets hermetic behavior — but the wrapper
@@ -1152,15 +1244,21 @@ is belt-and-suspenders.
 
 ### Running without the wrapper (only if you must)
 
-If you can't use the wrapper (e.g. on Windows or inside an IDE that shells
-pytest directly), at minimum activate the venv and pass `-n 4`:
+If you can't use the wrapper (e.g. inside an IDE that shells pytest directly),
+at minimum activate the venv. The isolation plugin loads automatically from
+`addopts` in `pyproject.toml`, so you get the same per-test process isolation
+either way.
 
 ```bash
 source .venv/bin/activate   # or: source venv/bin/activate
-python -m pytest tests/ -q -n 4
+python -m pytest tests/ -q
 ```
 
-Worker count above 4 will surface test-ordering flakes that CI never sees.
+If you need to bypass isolation for fast feedback while debugging:
+
+```bash
+python -m pytest tests/agent/test_foo.py -q --no-isolate
+```
 
 Always run the full suite before pushing changes.
 

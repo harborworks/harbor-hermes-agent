@@ -1,33 +1,24 @@
-"""Tavily web search + content extraction + crawl — plugin form.
+"""Tavily web search + content extraction — plugin form.
 
-Subclasses :class:`agent.web_search_provider.WebSearchProvider`. Three
+Subclasses :class:`agent.web_search_provider.WebSearchProvider`. Two
 capabilities advertised:
 
 - ``supports_search()``  -> True (Tavily ``/search``)
 - ``supports_extract()`` -> True (Tavily ``/extract``)
-- ``supports_crawl()``   -> True (Tavily ``/crawl``) — sync HTTP crawl;
-  Firecrawl also advertises ``supports_crawl=True`` (async)
 
-All three are sync — the underlying call is ``httpx.post(...)``. The
-dispatcher in :func:`tools.web_tools.web_crawl_tool` (which is itself
-async) will run sync providers in a thread when appropriate.
+Both are sync — the underlying call is ``httpx.post(...)``.
 
 Config keys this provider responds to::
 
     web:
       search_backend: "tavily"     # explicit per-capability
       extract_backend: "tavily"    # explicit per-capability
-      crawl_backend: "tavily"      # explicit per-capability
-      backend: "tavily"            # shared fallback for all three
+      backend: "tavily"            # shared fallback for both
 
 Env vars::
 
     TAVILY_API_KEY=...           # https://app.tavily.com/home (required)
     TAVILY_BASE_URL=...          # optional override of https://api.tavily.com
-
-Auth note: Tavily uses ``api_key`` in the JSON body for /search and
-/extract, but **also requires** ``Authorization: Bearer <key>`` for /crawl
-(body-only auth returns 401 on /crawl). The plugin handles both.
 """
 
 from __future__ import annotations
@@ -35,10 +26,82 @@ from __future__ import annotations
 import logging
 import os
 from typing import Any, Dict, List
+from urllib.parse import urlparse
 
 from agent.web_search_provider import WebSearchProvider
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_TAVILY_BASE_URL = "https://api.tavily.com"
+DEFAULT_HARBOR_ENGINE_BASE_URL = "https://engine.harborworks.ai"
+
+
+def _normalize_harbor_tool_base_url(base_url: str) -> str:
+    """Return the Harbor Engine root URL used by Tavily-compatible tool shims."""
+    normalized = (base_url or DEFAULT_HARBOR_ENGINE_BASE_URL).strip().rstrip("/")
+    if normalized.endswith("/anthropic"):
+        normalized = normalized[: -len("/anthropic")]
+    return normalized
+
+
+def _resolve_tavily_base_url() -> str:
+    """Resolve the Tavily-compatible base URL.
+
+    Harbor installs set HARBOR_ENGINE_BASE_URL instead of TAVILY_BASE_URL so
+    Hermes can keep using its existing Tavily web backend without storing a
+    duplicate Harbor token in ~/.hermes/.env.
+    """
+    explicit_tavily_base = os.getenv("TAVILY_BASE_URL", "").strip()
+    if explicit_tavily_base:
+        return explicit_tavily_base.rstrip("/")
+
+    harbor_base = os.getenv("HARBOR_ENGINE_BASE_URL", "").strip()
+    if harbor_base:
+        return _normalize_harbor_tool_base_url(harbor_base)
+
+    return DEFAULT_TAVILY_BASE_URL
+
+
+def _is_harbor_tool_base_url(base_url: str) -> bool:
+    """Return True when a Tavily-compatible URL points at Harbor Engine."""
+    normalized = base_url.rstrip("/")
+    harbor_env = os.getenv("HARBOR_ENGINE_BASE_URL", "").strip()
+    if harbor_env and normalized == _normalize_harbor_tool_base_url(harbor_env):
+        return True
+
+    try:
+        host = urlparse(normalized).hostname or ""
+    except Exception:
+        return False
+    return host in {"engine.harborworks.ai", "stage-engine.harborworks.ai"}
+
+
+def _resolve_harbor_engine_token() -> str:
+    """Resolve the Harbor bearer token from env or ~/.hw without persisting it."""
+    env_token = os.getenv("HARBOR_ENGINE_TOKEN", "").strip()
+    if env_token:
+        return env_token
+
+    try:
+        from hermes_cli.auth import _resolve_harbor_hw_token
+
+        token, _source = _resolve_harbor_hw_token()
+        return token
+    except Exception as exc:
+        logger.debug("Could not resolve Harbor Engine token for web tools: %s", exc)
+        return ""
+
+
+def _resolve_tavily_api_key(base_url: str) -> str:
+    """Resolve the secret used for Tavily-compatible requests."""
+    api_key = os.getenv("TAVILY_API_KEY", "").strip()
+    if api_key:
+        return api_key
+
+    if _is_harbor_tool_base_url(base_url):
+        return _resolve_harbor_engine_token()
+
+    return ""
 
 
 def _tavily_request(endpoint: str, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -50,24 +113,21 @@ def _tavily_request(endpoint: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     """
     import httpx
 
-    api_key = os.getenv("TAVILY_API_KEY")
+    base_url = _resolve_tavily_base_url()
+    api_key = _resolve_tavily_api_key(base_url)
     if not api_key:
         raise ValueError(
             "TAVILY_API_KEY environment variable not set. "
-            "Get your API key at https://app.tavily.com/home"
+            "Get your API key at https://app.tavily.com/home, or configure "
+            "HARBOR_ENGINE_BASE_URL with ~/.hw credentials for Harbor Engine."
         )
 
-    base_url = os.getenv("TAVILY_BASE_URL", "https://api.tavily.com")
     payload = dict(payload)  # don't mutate caller's dict
     payload["api_key"] = api_key
     url = f"{base_url}/{endpoint.lstrip('/')}"
     logger.info("Tavily %s request to %s", endpoint, url)
 
-    # Tavily /crawl requires Bearer header auth in addition to body auth;
-    # /search and /extract are body-only.
-    headers = {"Authorization": f"Bearer {api_key}"} if endpoint.strip("/") == "crawl" else {}
-
-    response = httpx.post(url, json=payload, headers=headers, timeout=60)
+    response = httpx.post(url, json=payload, timeout=60)
     response.raise_for_status()
     return response.json()
 
@@ -90,7 +150,7 @@ def _normalize_tavily_search_results(response: Dict[str, Any]) -> Dict[str, Any]
 def _normalize_tavily_documents(
     response: Dict[str, Any], fallback_url: str = ""
 ) -> List[Dict[str, Any]]:
-    """Map Tavily ``/extract`` or ``/crawl`` response to standard documents.
+    """Map Tavily ``/extract`` response to standard documents.
 
     Documents follow the legacy LLM post-processing shape::
 
@@ -139,7 +199,7 @@ def _normalize_tavily_documents(
 
 
 class TavilyWebSearchProvider(WebSearchProvider):
-    """Tavily search + extract + crawl provider."""
+    """Tavily search + extract provider."""
 
     @property
     def name(self) -> str:
@@ -150,16 +210,14 @@ class TavilyWebSearchProvider(WebSearchProvider):
         return "Tavily"
 
     def is_available(self) -> bool:
-        """Return True when ``TAVILY_API_KEY`` is set to a non-empty value."""
-        return bool(os.getenv("TAVILY_API_KEY", "").strip())
+        """Return True when Tavily or Harbor Engine credentials are available."""
+        base_url = _resolve_tavily_base_url()
+        return bool(_resolve_tavily_api_key(base_url))
 
     def supports_search(self) -> bool:
         return True
 
     def supports_extract(self) -> bool:
-        return True
-
-    def supports_crawl(self) -> bool:
         return True
 
     def search(self, query: str, limit: int = 5) -> Dict[str, Any]:
@@ -221,60 +279,11 @@ class TavilyWebSearchProvider(WebSearchProvider):
                 for u in urls
             ]
 
-    def crawl(self, url: str, **kwargs: Any) -> Dict[str, Any]:
-        """Crawl a seed URL via Tavily's ``/crawl`` endpoint.
-
-        Accepted kwargs (others ignored for forward compat):
-          - ``instructions``: str — natural-language guidance for the crawl
-          - ``depth``: str — ``"basic"`` (default) or ``"advanced"``
-          - ``limit``: int — max pages to crawl (default 20)
-
-        Returns ``{"results": [...]}`` shaped to match what
-        :func:`tools.web_tools.web_crawl_tool` post-processes.
-        """
-        try:
-            from tools.interrupt import is_interrupted
-
-            if is_interrupted():
-                return {"results": [{"url": url, "title": "", "content": "", "error": "Interrupted"}]}
-
-            instructions = kwargs.get("instructions")
-            depth = kwargs.get("depth", "basic")
-            limit = kwargs.get("limit", 20)
-
-            logger.info("Tavily crawl: %s (depth=%s, limit=%d)", url, depth, limit)
-            payload: Dict[str, Any] = {
-                "url": url,
-                "limit": limit,
-                "extract_depth": depth,
-            }
-            if instructions:
-                payload["instructions"] = instructions
-
-            raw = _tavily_request("crawl", payload)
-            return {
-                "results": _normalize_tavily_documents(raw, fallback_url=url)
-            }
-        except ValueError as exc:
-            return {"results": [{"url": url, "title": "", "content": "", "error": str(exc)}]}
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Tavily crawl error: %s", exc)
-            return {
-                "results": [
-                    {
-                        "url": url,
-                        "title": "",
-                        "content": "",
-                        "error": f"Tavily crawl failed: {exc}",
-                    }
-                ]
-            }
-
     def get_setup_schema(self) -> Dict[str, Any]:
         return {
             "name": "Tavily",
             "badge": "paid",
-            "tag": "Search + extract + crawl in one provider.",
+            "tag": "Search + extract in one provider.",
             "env_vars": [
                 {
                     "key": "TAVILY_API_KEY",

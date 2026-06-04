@@ -259,6 +259,10 @@ class TestBackendSelection:
         "TOOL_GATEWAY_SCHEME",
         "TOOL_GATEWAY_USER_TOKEN",
         "TAVILY_API_KEY",
+        "TAVILY_BASE_URL",
+        "HARBOR_ENGINE_BASE_URL",
+        "HARBOR_ENGINE_TOKEN",
+        "HARBOR_HW_CREDENTIALS",
     )
 
     def setup_method(self):
@@ -353,6 +357,42 @@ class TestBackendSelection:
         with patch("tools.web_tools._load_web_config", return_value={}), \
              patch.dict(os.environ, {"TAVILY_API_KEY": "tvly-test"}):
             assert _get_backend() == "tavily"
+
+    def test_fallback_tavily_with_harbor_engine_credentials(self, tmp_path):
+        """Harbor Engine credentials make the Tavily-compatible backend available."""
+        credentials_path = tmp_path / "credentials.json"
+        credentials_path.write_text(json.dumps({"token": "hw-test-token"}))
+
+        from tools.web_tools import _get_backend
+
+        with patch("tools.web_tools._load_web_config", return_value={}), \
+             patch.dict(
+                 os.environ,
+                 {
+                     "HARBOR_ENGINE_BASE_URL": "https://stage-engine.harborworks.ai",
+                     "HARBOR_HW_CREDENTIALS": str(credentials_path),
+                 },
+             ):
+            assert _get_backend() == "tavily"
+
+    def test_search_backend_tavily_with_harbor_engine_credentials(self, tmp_path):
+        """web.search_backend=tavily remains active without TAVILY_API_KEY."""
+        credentials_path = tmp_path / "credentials.json"
+        credentials_path.write_text(json.dumps({"token": "hw-test-token"}))
+
+        from tools.web_tools import _get_search_backend
+
+        with patch(
+            "tools.web_tools._load_web_config",
+            return_value={"search_backend": "tavily"},
+        ), patch.dict(
+            os.environ,
+            {
+                "HARBOR_ENGINE_BASE_URL": "https://stage-engine.harborworks.ai",
+                "HARBOR_HW_CREDENTIALS": str(credentials_path),
+            },
+        ):
+            assert _get_search_backend() == "tavily"
 
     def test_fallback_tavily_with_firecrawl_prefers_firecrawl(self):
         """Tavily + Firecrawl keys, no config → 'firecrawl' (backward compat)."""
@@ -623,9 +663,48 @@ class TestCheckWebApiKey:
             assert check_web_api_key() is True
 
     def test_tool_gateway_returns_true(self):
-        with patch("tools.web_tools._read_nous_access_token", return_value="nous-token"):
+        with patch("tools.web_tools._peek_nous_access_token", return_value="nous-token"):
             from tools.web_tools import check_web_api_key
             assert check_web_api_key() is True
+
+    def test_tool_gateway_availability_skips_refresh_for_expired_cached_token(
+        self,
+        tmp_path,
+        monkeypatch,
+    ):
+        monkeypatch.delenv("TOOL_GATEWAY_USER_TOKEN", raising=False)
+        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        expired_at = "2000-01-01T00:00:00+00:00"
+        (tmp_path / "auth.json").write_text(json.dumps({
+            "providers": {
+                "nous": {
+                    "access_token": "expired-token",
+                    "refresh_token": "refresh-token",
+                    "expires_at": expired_at,
+                }
+            }
+        }))
+        refresh_calls = []
+
+        def _record_refresh(*, refresh_skew_seconds=120, **_kwargs):
+            refresh_calls.append(refresh_skew_seconds)
+            return "fresh-token"
+
+        monkeypatch.setattr(
+            "hermes_cli.auth.resolve_nous_access_token",
+            _record_refresh,
+        )
+
+        with patch.dict(
+            os.environ,
+            {"FIRECRAWL_GATEWAY_URL": "http://127.0.0.1:3002"},
+            clear=False,
+        ):
+            from tools.web_tools import check_web_api_key
+
+            assert check_web_api_key() is True
+
+        assert refresh_calls == []
 
     def test_configured_backend_must_match_available_provider(self):
         with patch("tools.web_tools._load_web_config", return_value={"backend": "parallel"}):
@@ -636,7 +715,7 @@ class TestCheckWebApiKey:
 
     def test_configured_firecrawl_backend_accepts_managed_gateway(self):
         with patch("tools.web_tools._load_web_config", return_value={"backend": "firecrawl"}):
-            with patch("tools.web_tools._read_nous_access_token", return_value="nous-token"):
+            with patch("tools.web_tools._peek_nous_access_token", return_value="nous-token"):
                 with patch.dict(os.environ, {"FIRECRAWL_GATEWAY_URL": "http://127.0.0.1:3002"}, clear=False):
                     from tools.web_tools import check_web_api_key
                     assert check_web_api_key() is True

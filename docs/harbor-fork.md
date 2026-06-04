@@ -1,96 +1,94 @@
-# Harbor Hermes Fork
+# Harbor Works Harness Upstream Intake
 
-This repo is a skinny Harbor fork of upstream `NousResearch/hermes-agent`.
-Harbor changes should stay narrow enough to replay onto each new upstream tag
-without turning every release into a merge project.
+This codebase is the Harbor Works Harness. It began from upstream
+`NousResearch/hermes-agent`, but Harbor Works is now the product owner and
+source of truth.
 
-## Versioning
+Upstream Hermes is still useful. Do not ignore it. But do not replay every
+upstream release wholesale. For each upstream release, an agent reviews the
+changes and decides what is relevant to Harbor Works.
 
-Harbor release tags use:
+## Naming
 
-```text
-<upstream-tag>.harbor<num>
-```
+- User-facing product name: **Harbor Works**.
+- Intended harness/repo name: `harbor-works-harness`.
+- Keep proper technical names such as Harbor Engine, Harbor Works CLI, `hw`,
+  `~/.hw`, `harborworks` org/domain, and `HARBOR_*` env vars.
+- Do not shorten the product to "Harbor" or "Works" in user-facing text.
+- Historical file paths and package names may still contain `hermes` until an
+  explicit rename task changes them.
 
-Example:
+## Upstream Intake Checklist
 
-```text
-v2026.5.16.harbor1
-```
-
-Increment `<num>` when Harbor ships another patch on the same upstream tag.
-When upstream ships a newer tag, reset the base to that tag and start with
-`.harbor1` again.
-
-## Remote Convention
-
-Use `upstream` for `NousResearch/hermes-agent` and `origin` for the Harbor fork
-once the Harbor remote exists. If this checkout was cloned from upstream first,
-rename remotes before pushing Harbor branches:
-
-```bash
-git remote rename origin upstream
-git remote add origin git@github.com:harborworks/hermes-agent.git
-```
-
-## Upstream Replay Checklist
-
-1. Fetch upstream tags:
+1. Fetch upstream:
 
 ```bash
 git fetch upstream --tags
 ```
 
-2. Create a fresh branch from the new upstream tag:
+2. Identify the upstream release or commit range to review.
+
+3. Create a review branch from current Harbor Works `main`, not from the
+   upstream tag:
 
 ```bash
-git checkout -b harbor/v2026.5.16.harbor1 v2026.5.16
+git fetch origin
+git checkout -b codex/upstream-intake-<version> origin/main
 ```
 
-3. Replay Harbor patches from the prior Harbor tag or patch branch:
+4. Review upstream release notes, commits, and changed files. Prioritize:
 
-```bash
-git cherry-pick <harbor-commit-1> <harbor-commit-2>
-```
+- security fixes
+- protocol/API compatibility
+- desktop stability and packaging fixes
+- provider, auth, model, tool, and gateway behavior relevant to Harbor Works
+- tests that reveal real regressions in Harbor Works surfaces
 
-4. Resolve conflicts by preserving upstream behavior unless the conflict is
-   directly in Harbor auth, provider, catalog, Engine, or managed-mode code.
+5. Decide per upstream change:
 
-5. Run local verification:
+- accept and port
+- accept with Harbor Works-specific adaptation
+- defer with reason
+- reject as not relevant
+
+6. Port accepted changes deliberately. Prefer small commits grouped by concern.
+
+7. Run local verification:
 
 ```bash
 ./init.sh
 ```
 
-6. If Harbor Engine/provider/auth/catalog code changed, run the stage Engine
-   smoke:
+8. If Harbor Engine/provider/auth/catalog code changed, run:
 
 ```bash
-scripts/harbor-stage-engine-smoke.sh
+scripts/harbor-engine-smoke.sh
 ```
 
-7. Record the exact evidence in a dated file under `agent_state/progress/`.
+9. Record the review in a dated handoff under `agent_state/progress/` with:
 
-8. Tag the Harbor release:
-
-```bash
-git tag v2026.5.16.harbor1
-```
+- upstream version/range reviewed
+- accepted changes
+- rejected or deferred changes
+- rationale
+- files changed
+- verification evidence
+- next action
 
 ## Auth Rule
 
-Harbor managed mode uses the long-lived credential written by `hw` under
+Harbor Works managed mode uses the long-lived credential written by `hw` under
 `~/.hw/credentials.json`, or a named profile under `~/.hw/profiles/`.
 
 Do not copy that token into `~/.hermes/.env`, `~/.hermes/config.yaml`, checked-in
 fixtures, test output, logs, or handoff files.
 
-## Stage Engine Smoke
+## Engine Smoke
 
 The smoke script defaults to:
 
 ```text
-https://stage-engine.harborworks.ai
+https://engine.harborworks.ai
 ```
 
 It reads:
@@ -106,4 +104,4 @@ and sends a minimal Anthropic-compatible request to:
 ```
 
 Set `HARBOR_ENGINE_BASE_URL`, `HARBOR_HW_CREDENTIALS`, or
-`HARBOR_MODEL_PROXY_TOKEN` to override defaults for local debugging.
+`HARBOR_ENGINE_TOKEN` to override defaults for local debugging.

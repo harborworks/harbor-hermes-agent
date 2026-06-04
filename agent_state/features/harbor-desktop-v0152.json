@@ -1,0 +1,81 @@
+{
+  "id": "harbor-desktop-v0152",
+  "name": "Harbor Works desktop v0.15.2",
+  "title": "Bring the Harbor Works desktop app onto Hermes 0.15.2",
+  "description": "Fold in relevant Hermes desktop 0.15.2 changes while making Harbor Works the product source of truth: Harbor Works branding, Harbor Works provider/auth flows, OpenAI Codex support, working desktop model switching, and update paths that point at Harbor Works.",
+  "project_identity": {
+    "product_name": "Harbor Works",
+    "target_harness_name": "harbor-works-harness",
+    "upstream_policy": "Review each upstream Hermes release and port only changes relevant to Harbor Works. Do not automatically replay the full upstream release."
+  },
+  "status": "in_review",
+  "priority": "p0",
+  "branch": "codex/harbor-desktop-v0152",
+  "pull_request": "https://github.com/harborworks/harbor-hermes-agent/pull/16",
+  "base_branch": "main",
+  "desktop_version": "0.15.2",
+  "dependencies": [
+    {
+      "repo": "~/code/harbor-cli",
+      "contract": "The desktop app shells out to the Harbor Works CLI install/auth flow and reads long-lived ~/.hw credentials through the CLI-owned layout."
+    },
+    {
+      "repo": "~/code/harbor-engine",
+      "contract": "Harbor Works provider traffic routes through Harbor Engine; user-facing desktop model surfaces should show Harbor Works and OpenAI Codex only."
+    },
+    {
+      "repo": "~/code/harbor-landing-page",
+      "contract": "The desktop app icon uses the new Harbor Works lighthouse mark from the landing-page design system."
+    }
+  ],
+  "scope": [
+    "Desktop package and runtime identity are Harbor Works, not Hermes",
+    "Desktop model/settings surfaces expose Harbor Works and OpenAI Codex only",
+    "Harbor Works CLI install and OAuth/auth flow can run in app",
+    "OpenAI Codex OAuth sign-in is available from desktop settings/provider setup",
+    "The /model command works in desktop for authenticated model switching",
+    "CLI and desktop update paths point at Harbor Works where applicable",
+    "The harness records Harbor Works as the product source of truth and treats upstream Hermes as reviewed input, not an automatic base"
+  ],
+  "out_of_scope": [
+    "Broad upstream desktop redesign beyond required Harbor Works identity and provider/auth flows",
+    "Replacing the Hermes backend/runtime package names where they are still implementation details",
+    "Short-lived Harbor invocation credentials",
+    "Raw provider-key routing for managed Harbor Works flows",
+    "Automatic wholesale replay of every upstream Hermes release"
+  ],
+  "done_criteria": [
+    "PR #16 is merged into harborworks/harbor-hermes-agent main",
+    "Packaged macOS app launches as Harbor Works with bundle id com.harborworks.desktop",
+    "Dock icon stays on the Harbor Works lighthouse mark after app launch",
+    "Desktop can authenticate and send a test message with an authenticated model",
+    "Focused build and desktop smoke checks pass",
+    "Follow-up tasks start from updated main in separate worktrees",
+    "Future upstream release intake is documented with accepted/rejected changes and rationale"
+  ],
+  "evidence": [
+    "Opened PR #16: https://github.com/harborworks/harbor-hermes-agent/pull/16.",
+    "Pushed branch codex/harbor-desktop-v0152 through commit 3cca153ce.",
+    "Folded desktop package metadata to version 0.15.2.",
+    "Scoped desktop onboarding/settings model surfaces to Harbor Works and OpenAI Codex.",
+    "Added Harbor Works CLI install/auth handling in desktop onboarding.",
+    "Added OpenAI Codex / ChatGPT sign-in surface back to desktop.",
+    "Restored /model command behavior in the desktop slash-command path.",
+    "Replaced desktop app icon assets with the new Harbor Works lighthouse mark from ~/code/harbor-landing-page/public/icon-color.png.",
+    "Renamed packaged app identity to Harbor Works, including macOS bundle display name, executable, bundle id com.harborworks.desktop, window title, app menu title, About/update labels, and first-screen intro.",
+    "Installed /Applications/Harbor Works.app locally and removed /Applications/Hermes.app.",
+    "Computer Use verified running app: App=/Applications/Harbor Works.app, bundleID com.harborworks.desktop, Window: Harbor Works, menu bar: Harbor Works.",
+    "Computer Use verified desktop chat response to 'What model are you running?': 'I'm running gpt-5.5 via openai-codex in this session.'",
+    "Desktop proof screenshot saved at /Users/jbencook/Desktop/harbor-works-open-proof-20260604-0844.png.",
+    "node --check apps/desktop/electron/main.cjs apps/desktop/electron/hardening.cjs apps/desktop/scripts/after-pack.cjs apps/desktop/scripts/set-exe-identity.cjs passed on 2026-06-04.",
+    "npm run build --workspace apps/desktop passed on 2026-06-04.",
+    "CSC_IDENTITY_AUTO_DISCOVERY=false npm run builder --workspace apps/desktop -- --dir -c.mac.identity=null passed on 2026-06-04.",
+    "HERMES_DESKTOP_SKIP_BUILD=1 npm run test:desktop:existing --workspace apps/desktop passed on 2026-06-04 against release/mac-arm64/Harbor Works.app.",
+    "Harness validator reported 100/100 on 2026-06-04 after adding the desktop v0.15.2 feature state and parallel-worktree protocol.",
+    "uv sync --extra dev repaired the local worktree .venv on 2026-06-04 so scripts/run_tests.sh no longer failed with 'No module named pytest'.",
+    "./init.sh passed on 2026-06-04 after harness updates: tests/hermes_cli/test_config.py completed with 88 passed.",
+    "Harness decision recorded on 2026-06-04: Harbor Works is the product source of truth; the intended harness name is harbor-works-harness; upstream Hermes releases require agent review and selective intake.",
+    "Harness decision recorded on 2026-06-04: user-facing naming should consistently use Harbor Works, not shorten to Harbor or Works except in established technical names."
+  ],
+  "next_action": "Merge PR #16, update local main, then create separate harbor-works-harness-<task-slug> worktrees and codex/<task-slug> branches for the next independent tasks."
+}

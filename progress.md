@@ -1,4 +1,4 @@
-# Harbor Hermes Progress
+# Harbor Works Harness Progress
 
 This file is a stable index. Routine evidence and handoffs belong in dated
 files under `agent_state/progress/`.
@@ -6,16 +6,20 @@ files under `agent_state/progress/`.
 ## State Files
 
 - Feature index: `feature_list.json`
-- Active feature: `agent_state/features/harbor-skinny-fork.json`
+- Active feature: `agent_state/features/harbor-desktop-v0152.json`
 - Session handoffs: `agent_state/progress/*.md`
 
 ## Current Focus
 
-Active feature: `harbor-skinny-fork`
+Active feature: `harbor-desktop-v0152`
 
-Maintain a minimal Harbor patch series on top of upstream Hermes Agent tags.
-The first Harbor version is `v2026.5.16.harbor1`, based on upstream
-`v2026.5.16`.
+Bring the Harbor Works desktop app onto selected relevant Hermes `0.15.2`
+changes, keep the app branded as Harbor Works, and prepare PR #16 for merge.
+After merge, start follow-up work in separate worktrees, one branch per task.
+
+Strategic decision: Harbor Works Harness is a hard eject from Hermes as product
+source of truth. For each upstream Hermes release, an agent reviews the release
+and ports only changes that matter for `harbor-works-harness`.
 
 ## Startup Checklist
 
@@ -36,7 +40,7 @@ Run:
 For Harbor Engine integration changes, also run:
 
 ```bash
-scripts/harbor-stage-engine-smoke.sh
+scripts/harbor-engine-smoke.sh
 ```
 
 Record any failure or environment blocker in a dated handoff.
