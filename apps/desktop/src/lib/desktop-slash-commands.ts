@@ -30,6 +30,7 @@ const DESKTOP_COMMAND_META = [
   ['/debug', 'Create a debug report'],
   ['/goal', 'Manage the standing goal for this session'],
   ['/help', 'Show desktop slash commands'],
+  ['/model', 'Open the model picker'],
   ['/new', 'Start a new desktop chat'],
   ['/queue', 'Queue a prompt for the next turn'],
   ['/resume', 'Resume a saved session'],
@@ -59,7 +60,7 @@ const DESKTOP_ALIASES = new Map([
 
 const DESKTOP_COMMAND_DESCRIPTIONS: ReadonlyMap<string, string> = new Map(DESKTOP_COMMAND_META)
 
-const PICKER_OWNED_COMMANDS = new Set(['/model'])
+const PICKER_OWNED_COMMANDS = new Set<string>()
 
 const TERMINAL_ONLY_COMMANDS = new Set([
   '/browser',

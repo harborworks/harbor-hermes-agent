@@ -169,12 +169,14 @@ export function ConfigSettings({
   activeSectionId,
   onConfigSaved,
   onMainModelChanged,
-  importInputRef
+  importInputRef,
+  requestGateway
 }: SearchProps & {
   activeSectionId: string
   onConfigSaved?: () => void
   onMainModelChanged?: (provider: string, model: string) => void
   importInputRef: React.RefObject<HTMLInputElement | null>
+  requestGateway?: <T = unknown>(method: string, params?: Record<string, unknown>) => Promise<T>
 }) {
   const [config, setConfig] = useState<HermesConfigRecord | null>(null)
   const [_defaults, setDefaults] = useState<HermesConfigRecord | null>(null)
@@ -327,7 +329,7 @@ export function ConfigSettings({
     <SettingsContent>
       {activeSectionId === 'model' && !query.trim() && (
         <div className="mb-6">
-          <ModelSettings onMainModelChanged={onMainModelChanged} />
+          <ModelSettings onMainModelChanged={onMainModelChanged} requestGateway={requestGateway} />
         </div>
       )}
       {query.trim() && (

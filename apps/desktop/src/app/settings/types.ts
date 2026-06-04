@@ -13,6 +13,7 @@ export interface SettingsPageProps {
   onClose: () => void
   onConfigSaved?: () => void
   onMainModelChanged?: (provider: string, model: string) => void
+  requestGateway?: <T = unknown>(method: string, params?: Record<string, unknown>) => Promise<T>
 }
 
 export interface SearchProps {

@@ -9,6 +9,7 @@ import type { ModelOptionsResponse, SessionInfo } from '@/types/hermes'
 
 export const INTERRUPTED_MARKER = '\n\n_[interrupted]_'
 export const SLASH_COMMAND_RE = /^\/[^\s/]*(?:\s|$)/
+const SLASH_DIRECTIVE_RE = /^@slash:`([^`|]+)(?:\|[^`]*)?`\s*(.*)$/s
 export const BUILTIN_PERSONALITIES = [
   'helpful',
   'concise',
@@ -184,6 +185,26 @@ export function parseSlashCommand(command: string) {
   const match = command.replace(/^\/+/, '').match(/^(\S+)\s*(.*)$/)
 
   return match ? { name: match[1], arg: match[2].trim() } : { name: '', arg: '' }
+}
+
+export function normalizeSlashCommandText(text: string): string | null {
+  const trimmed = text.trim()
+
+  if (SLASH_COMMAND_RE.test(trimmed)) {
+    return trimmed
+  }
+
+  const directiveMatch = trimmed.match(SLASH_DIRECTIVE_RE)
+
+  if (!directiveMatch) {
+    return null
+  }
+
+  const commandText = directiveMatch[1].trim()
+  const trailingText = directiveMatch[2].trim()
+  const normalized = commandText.startsWith('/') ? commandText : `/${commandText}`
+
+  return [normalized, trailingText].filter(Boolean).join(' ')
 }
 
 export function parseCommandDispatch(raw: unknown): CommandDispatchResponse | null {

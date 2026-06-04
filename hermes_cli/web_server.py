@@ -1819,9 +1819,23 @@ def get_model_options():
     try:
         from hermes_cli.inventory import build_models_payload, load_picker_context
 
-        return build_models_payload(
+        payload = build_models_payload(
             load_picker_context(), max_models=50, pricing=True, capabilities=True
         )
+        if not _harbor_show_all_providers():
+            providers = payload.get("providers")
+            if isinstance(providers, list):
+                payload = {
+                    **payload,
+                    "providers": [
+                        _harbor_branded_model_provider(p) for p in providers
+                        if str(p.get("slug", "")).lower() in _HARBOR_VISIBLE_MODEL_PROVIDER_SLUGS
+                    ],
+                }
+                provider = str(payload.get("provider", "")).lower()
+                if provider and provider not in _HARBOR_VISIBLE_MODEL_PROVIDER_SLUGS:
+                    payload["provider"] = ""
+        return payload
     except Exception:
         _log.exception("GET /api/model/options failed")
         raise HTTPException(status_code=500, detail="Failed to list model options")
@@ -3195,12 +3209,24 @@ _OAUTH_PROVIDER_CATALOG: tuple[Dict[str, Any], ...] = (
 
 
 _HARBOR_VISIBLE_OAUTH_PROVIDER_IDS = {"harbor", "openai-codex"}
+_HARBOR_VISIBLE_MODEL_PROVIDER_SLUGS = {"harbor", "openai-codex"}
+
+
+def _harbor_show_all_providers() -> bool:
+    show_all = os.getenv("HARBOR_SHOW_ALL_PROVIDERS", "").strip().lower()
+    return show_all in {"1", "true", "yes", "on"}
+
+
+def _harbor_branded_model_provider(provider: Dict[str, Any]) -> Dict[str, Any]:
+    """Normalize provider display names for the Harbor Works desktop build."""
+    if str(provider.get("slug", "")).lower() == "harbor":
+        return {**provider, "name": "Harbor Works"}
+    return provider
 
 
 def _visible_oauth_provider_catalog() -> tuple[Dict[str, Any], ...]:
     """Return provider picker entries visible in Harbor desktop builds."""
-    show_all = os.getenv("HARBOR_SHOW_ALL_PROVIDERS", "").strip().lower()
-    if show_all in {"1", "true", "yes", "on"}:
+    if _harbor_show_all_providers():
         return _OAUTH_PROVIDER_CATALOG
     return tuple(
         p for p in _OAUTH_PROVIDER_CATALOG

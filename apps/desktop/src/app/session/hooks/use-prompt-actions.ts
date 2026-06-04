@@ -6,10 +6,10 @@ import { appendTextPart, branchGroupForUser, type ChatMessage, chatMessageText, 
 import {
   attachmentDisplayText,
   INTERRUPTED_MARKER,
+  normalizeSlashCommandText,
   parseCommandDispatch,
   parseSlashCommand,
-  pathLabel,
-  SLASH_COMMAND_RE
+  pathLabel
 } from '@/lib/chat-runtime'
 import {
   type CommandsCatalogLike,
@@ -28,7 +28,7 @@ import {
 } from '@/store/composer'
 import { clearNotifications, notify, notifyError } from '@/store/notifications'
 import { requestDesktopOnboarding } from '@/store/onboarding'
-import { $busy, $messages, setAwaitingResponse, setBusy, setMessages } from '@/store/session'
+import { $busy, $messages, setAwaitingResponse, setBusy, setMessages, setModelPickerOpen } from '@/store/session'
 
 import type { ClientSessionState, ImageAttachResponse, SlashExecResponse } from '../../types'
 
@@ -406,6 +406,12 @@ export function usePromptActions({
           return
         }
 
+        if (normalizedName === 'model' && !arg.trim()) {
+          setModelPickerOpen(true)
+
+          return
+        }
+
         const sessionId = sessionHint || activeSessionIdRef.current || (await createBackendSessionForSend())
 
         if (!sessionId) {
@@ -432,6 +438,22 @@ export function usePromptActions({
             const catalog = await requestGateway<CommandsCatalogLike>('commands.catalog', { session_id: sessionId })
 
             renderSlashOutput(renderCommandsCatalog(catalog))
+          } catch (err) {
+            renderSlashOutput(`error: ${err instanceof Error ? err.message : String(err)}`)
+          }
+
+          return
+        }
+
+        if (normalizedName === 'model') {
+          try {
+            const result = await requestGateway<SlashExecResponse>('slash.exec', {
+              session_id: sessionId,
+              command: command.replace(/^\/+/, '')
+            })
+
+            const body = result?.output || `/${name}: no output`
+            renderSlashOutput(result?.warning ? `warning: ${result.warning}\n${body}` : body)
           } catch (err) {
             renderSlashOutput(`error: ${err instanceof Error ? err.message : String(err)}`)
           }
@@ -531,10 +553,11 @@ export function usePromptActions({
     async (rawText: string, options?: SubmitTextOptions) => {
       const visibleText = rawText.trim()
       const attachments = options?.attachments ?? $composerAttachments.get()
+      const slashCommandText = attachments.length ? null : normalizeSlashCommandText(visibleText)
 
-      if (!attachments.length && SLASH_COMMAND_RE.test(visibleText)) {
+      if (slashCommandText) {
         triggerHaptic('selection')
-        await executeSlashCommand(visibleText)
+        await executeSlashCommand(slashCommandText)
 
         return true
       }

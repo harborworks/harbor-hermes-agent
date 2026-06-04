@@ -13,6 +13,7 @@ describe('desktop slash command curation', () => {
   it('keeps core desktop chat commands in suggestions', () => {
     expect(isDesktopSlashSuggestion('/new')).toBe(true)
     expect(isDesktopSlashSuggestion('/branch')).toBe(true)
+    expect(isDesktopSlashSuggestion('/model')).toBe(true)
     expect(isDesktopSlashSuggestion('/skin')).toBe(true)
     expect(isDesktopSlashSuggestion('/usage')).toBe(true)
   })
@@ -27,7 +28,6 @@ describe('desktop slash command curation', () => {
     expect(isDesktopSlashSuggestion('/compact')).toBe(false)
     expect(isDesktopSlashSuggestion('/redraw')).toBe(false)
     expect(isDesktopSlashSuggestion('/approve')).toBe(false)
-    expect(isDesktopSlashSuggestion('/model')).toBe(false)
     expect(isDesktopSlashSuggestion('/skills')).toBe(false)
     expect(isDesktopSlashSuggestion('/voice')).toBe(false)
     expect(isDesktopSlashSuggestion('/curator')).toBe(false)
@@ -62,7 +62,10 @@ describe('desktop slash command curation', () => {
     })
 
     expect(filtered.categories).toEqual([{ name: 'Session', pairs: [['/new', 'Start a new desktop chat']] }])
-    expect(filtered.pairs).toEqual([['/new', 'Start a new desktop chat']])
+    expect(filtered.pairs).toEqual([
+      ['/new', 'Start a new desktop chat'],
+      ['/model', 'Open the model picker']
+    ])
     expect(filtered.skill_count).toBe(2)
   })
 
@@ -101,7 +104,6 @@ describe('desktop slash command curation', () => {
   })
 
   it('explains known commands that desktop owns elsewhere', () => {
-    expect(desktopSlashUnavailableMessage('/model sonnet')).toContain('model picker')
     expect(desktopSlashUnavailableMessage('/skills')).toContain('desktop sidebar')
     expect(desktopSlashUnavailableMessage('/clear')).toContain('terminal interface')
   })

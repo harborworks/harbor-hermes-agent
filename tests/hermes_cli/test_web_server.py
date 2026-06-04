@@ -3908,3 +3908,45 @@ class TestHarborDesktopOAuthProviders:
         assert data["flow"] == "device_code"
         assert data["user_code"] == "HW-123"
         assert data["verification_url"].startswith("https://platform.harborworks.ai/")
+
+    def test_model_options_are_harbor_scoped_by_default(self, monkeypatch):
+        monkeypatch.setattr("hermes_cli.inventory.load_picker_context", lambda: object())
+        monkeypatch.setattr(
+            "hermes_cli.inventory.build_models_payload",
+            lambda *_args, **_kwargs: {
+                "provider": "anthropic",
+                "model": "claude-opus",
+                "providers": [
+                    {"name": "Harbor Works", "slug": "harbor", "models": ["claude-sonnet-4.6"]},
+                    {"name": "OpenAI Codex", "slug": "openai-codex", "models": ["gpt-5.2-codex"]},
+                    {"name": "Anthropic Claude", "slug": "anthropic", "models": ["claude-opus"]},
+                    {"name": "Nous Portal", "slug": "nous", "models": ["hermes-4"]},
+                ],
+            },
+        )
+
+        data = self.client.get("/api/model/options").json()
+
+        assert [provider["slug"] for provider in data["providers"]] == ["harbor", "openai-codex"]
+        assert data["providers"][0]["name"] == "Harbor Works"
+        assert data["provider"] == ""
+
+    def test_model_options_can_show_all_providers_for_dev(self, monkeypatch):
+        monkeypatch.setenv("HARBOR_SHOW_ALL_PROVIDERS", "true")
+        monkeypatch.setattr("hermes_cli.inventory.load_picker_context", lambda: object())
+        monkeypatch.setattr(
+            "hermes_cli.inventory.build_models_payload",
+            lambda *_args, **_kwargs: {
+                "provider": "anthropic",
+                "model": "claude-opus",
+                "providers": [
+                    {"name": "Harbor Works", "slug": "harbor", "models": ["claude-sonnet-4.6"]},
+                    {"name": "Anthropic Claude", "slug": "anthropic", "models": ["claude-opus"]},
+                ],
+            },
+        )
+
+        data = self.client.get("/api/model/options").json()
+
+        assert [provider["slug"] for provider in data["providers"]] == ["harbor", "anthropic"]
+        assert data["provider"] == "anthropic"
