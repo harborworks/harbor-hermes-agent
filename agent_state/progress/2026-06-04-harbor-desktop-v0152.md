@@ -6,7 +6,7 @@
   separate worktrees and sessions.
 - Branch: `codex/harbor-desktop-v0152`
 - PR: https://github.com/harborworks/harbor-hermes-agent/pull/16
-- Current status: PR is open and pushed through `3cca153ce`.
+- Current status: PR is open, pushed, and ready for review/merge.
 
 ## Completed
 
@@ -62,15 +62,26 @@ were changed by that environment repair.
 
 - `AGENTS.md` now includes a short parallel-worktree protocol.
 - The active feature is now `harbor-desktop-v0152`; the May skinny-fork state
-  remains available for historical Harbor fork context.
+  is now marked superseded and remains available only for historical context.
 - Future parallel tasks should each get their own worktree, branch, feature
   file, and dated handoff to avoid merge conflicts.
+- Harbor Works is now the product source of truth. This is a hard eject from
+  Hermes as the product base, while still allowing selective upstream intake.
+- For every upstream Hermes release, an agent should review the release and
+  decide which changes are relevant to `harbor-works-harness`; wholesale replay
+  is not the default process.
+- User-facing naming should consistently use **Harbor Works**. Do not shorten
+  the product to "Harbor" or "Works" except for established technical names
+  such as Harbor Engine, Harbor Works CLI, `hw`, `~/.hw`, `harborworks`, and
+  `HARBOR_*` identifiers.
 
 ## Blockers / Risks
 
 - None blocking PR #16.
 - PR #16 should be merged before starting follow-up branches so worktrees begin
   from the Harbor Works desktop baseline.
+- Future repo/path/package renames to `harbor-works-harness` are not part of
+  this harness-only decision update.
 
 ## Recommended Next Step
 
@@ -80,7 +91,7 @@ were changed by that environment repair.
 
 ```bash
 git fetch origin
-git worktree add ../harbor-hermes-<task-slug> -b codex/<task-slug> origin/main
+git worktree add ../harbor-works-harness-<task-slug> -b codex/<task-slug> origin/main
 ```
 
 4. In each new session, read `AGENTS.md`, `progress.md`,

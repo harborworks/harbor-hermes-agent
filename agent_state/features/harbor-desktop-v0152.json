@@ -2,7 +2,12 @@
   "id": "harbor-desktop-v0152",
   "name": "Harbor Works desktop v0.15.2",
   "title": "Bring the Harbor Works desktop app onto Hermes 0.15.2",
-  "description": "Fold in Hermes desktop 0.15.2 while keeping the Harbor fork narrow: Harbor Works branding, Harbor Works provider/auth flows, OpenAI Codex support, working desktop model switching, and update paths that point at the Harbor fork.",
+  "description": "Fold in relevant Hermes desktop 0.15.2 changes while making Harbor Works the product source of truth: Harbor Works branding, Harbor Works provider/auth flows, OpenAI Codex support, working desktop model switching, and update paths that point at Harbor Works.",
+  "project_identity": {
+    "product_name": "Harbor Works",
+    "target_harness_name": "harbor-works-harness",
+    "upstream_policy": "Review each upstream Hermes release and port only changes relevant to Harbor Works. Do not automatically replay the full upstream release."
+  },
   "status": "in_review",
   "priority": "p0",
   "branch": "codex/harbor-desktop-v0152",
@@ -29,13 +34,15 @@
     "Harbor Works CLI install and OAuth/auth flow can run in app",
     "OpenAI Codex OAuth sign-in is available from desktop settings/provider setup",
     "The /model command works in desktop for authenticated model switching",
-    "CLI and desktop update paths point at Harbor Works where applicable"
+    "CLI and desktop update paths point at Harbor Works where applicable",
+    "The harness records Harbor Works as the product source of truth and treats upstream Hermes as reviewed input, not an automatic base"
   ],
   "out_of_scope": [
     "Broad upstream desktop redesign beyond required Harbor Works identity and provider/auth flows",
     "Replacing the Hermes backend/runtime package names where they are still implementation details",
     "Short-lived Harbor invocation credentials",
-    "Raw provider-key routing for managed Harbor Works flows"
+    "Raw provider-key routing for managed Harbor Works flows",
+    "Automatic wholesale replay of every upstream Hermes release"
   ],
   "done_criteria": [
     "PR #16 is merged into harborworks/harbor-hermes-agent main",
@@ -43,7 +50,8 @@
     "Dock icon stays on the Harbor Works lighthouse mark after app launch",
     "Desktop can authenticate and send a test message with an authenticated model",
     "Focused build and desktop smoke checks pass",
-    "Follow-up tasks start from updated main in separate worktrees"
+    "Follow-up tasks start from updated main in separate worktrees",
+    "Future upstream release intake is documented with accepted/rejected changes and rationale"
   ],
   "evidence": [
     "Opened PR #16: https://github.com/harborworks/harbor-hermes-agent/pull/16.",
@@ -65,7 +73,9 @@
     "HERMES_DESKTOP_SKIP_BUILD=1 npm run test:desktop:existing --workspace apps/desktop passed on 2026-06-04 against release/mac-arm64/Harbor Works.app.",
     "Harness validator reported 100/100 on 2026-06-04 after adding the desktop v0.15.2 feature state and parallel-worktree protocol.",
     "uv sync --extra dev repaired the local worktree .venv on 2026-06-04 so scripts/run_tests.sh no longer failed with 'No module named pytest'.",
-    "./init.sh passed on 2026-06-04 after harness updates: tests/hermes_cli/test_config.py completed with 88 passed."
+    "./init.sh passed on 2026-06-04 after harness updates: tests/hermes_cli/test_config.py completed with 88 passed.",
+    "Harness decision recorded on 2026-06-04: Harbor Works is the product source of truth; the intended harness name is harbor-works-harness; upstream Hermes releases require agent review and selective intake.",
+    "Harness decision recorded on 2026-06-04: user-facing naming should consistently use Harbor Works, not shorten to Harbor or Works except in established technical names."
   ],
-  "next_action": "Merge PR #16, update local main, then create separate worktrees and codex/<task-slug> branches for the next independent tasks."
+  "next_action": "Merge PR #16, update local main, then create separate harbor-works-harness-<task-slug> worktrees and codex/<task-slug> branches for the next independent tasks."
 }

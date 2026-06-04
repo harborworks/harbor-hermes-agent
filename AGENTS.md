@@ -1,20 +1,39 @@
-# Hermes Agent - Development Guide
+# Harbor Works Harness - Development Guide
 
-## Harbor Fork Overlay
+## Harbor Works Harness Overlay
 
-This checkout is the skinny Harbor fork of upstream `NousResearch/hermes-agent`.
-Keep Harbor changes small, isolated, and easy to replay on top of new upstream
-tags.
+This checkout is the Harbor Works Harness codebase. It started from upstream
+`NousResearch/hermes-agent`, but Harbor Works is now the product owner and
+source of truth. Treat upstream Hermes as an input stream to review, not as a
+base that must be replayed wholesale every release.
 
-### Harbor Mission
+The intended project/repo name is `harbor-works-harness`. Existing paths,
+package names, and historical files may still contain `hermes` or
+`harbor-hermes-agent` until an explicit rename task lands.
 
-Harbor uses this fork to ship managed Hermes agents that talk to Harbor Engine
-for model and web-tool traffic. Harbor-specific behavior should be limited to
-provider/auth/catalog/runtime integration needed for managed Harbor agents.
+### Harbor Works Mission
 
-Do not turn this fork into a broad Hermes rewrite. Prefer additive
-Harbor-named modules, narrow provider hooks, and small patches over editing
-large upstream flows.
+Harbor Works uses this codebase to ship managed agent harnesses that talk to
+Harbor Engine for model and web-tool traffic. Harbor Works behavior should be
+limited to the product surfaces, provider/auth/catalog/runtime integration, and
+managed-agent compatibility needed for Harbor Works users.
+
+Do not frame new product decisions as "Hermes with Harbor patches." Build the
+Harbor Works product deliberately, with small focused changes and clear
+handoffs. Keep inherited Hermes internals when they are still useful, but do
+not preserve upstream behavior merely because it is upstream.
+
+### Brand Naming Rules
+
+- User-facing product name: **Harbor Works**.
+- Harness/repo target name: `harbor-works-harness`.
+- Use **Harbor Works** in app names, setup flows, docs, user-visible errors,
+  PR descriptions, and handoffs when referring to the product.
+- Do not shorten the product to "Harbor" or "Works" in user-facing text.
+- Keep established technical names where they are proper nouns or identifiers:
+  `harborworks` GitHub org/domain, Harbor Engine, Harbor Works CLI, `hw`,
+  `~/.hw`, `HARBOR_*` environment variables, and existing file/package names
+  until a rename task explicitly changes them.
 
 ### Companion Repos
 
@@ -32,7 +51,8 @@ large upstream flows.
    `agent_state/progress/`.
 2. Check `git status --short --branch` and preserve user changes.
 3. Inspect upstream implementation before editing. Prefer `rg` and `rg --files`.
-4. Keep each Harbor patch replayable against the latest upstream tag.
+4. Check whether the task touches inherited Hermes behavior; if so, inspect the
+   relevant upstream code before editing.
 5. Run focused checks while iterating, then run `./init.sh` before claiming the
    fork harness is healthy.
 6. Update feature state and add a dated handoff with evidence, blockers, files
@@ -57,9 +77,9 @@ large upstream flows.
 
 - Work one feature at a time. The active feature is the file named by
   `feature_list.json` unless the user explicitly changes priority.
-- Keep this fork focused on Harbor-specific Hermes integration: Harbor auth,
-  Harbor Engine routing, Harbor-supported catalog behavior, and managed-agent
-  runtime compatibility.
+- Keep the codebase focused on Harbor Works agent harness behavior: Harbor
+  Works auth, Harbor Engine routing, Harbor Works-supported catalog behavior,
+  and managed-agent runtime compatibility.
 - If a change belongs in `~/code/harbor`, `~/code/harbor-cli`,
   `~/code/harbor-engine`, or `~/code/harbor-agents`, document the cross-repo
   contract and stop at the boundary unless the user asks for multi-repo edits.
@@ -67,18 +87,24 @@ large upstream flows.
   must meet its done criteria and have verification evidence in
   `agent_state/features/*.json` plus a dated handoff.
 
-### Versioning And Upstream Replay
+### Upstream Intake Policy
 
-- Start every Harbor release from an upstream tag.
-- Harbor release tags use `<upstream-tag>.harbor<num>`, for example
-  `v2026.5.16.harbor1`.
-- When upstream ships a new tag, create a fresh Harbor branch from that tag,
-  replay the Harbor patch series, resolve conflicts in the smallest possible
-  way, rerun verification, then cut the next `.harbor<num>` tag.
+- Do not automatically replay the Harbor Works patch series onto each upstream
+  Hermes release.
+- For every upstream Hermes release, assign an agent to review the release
+  notes, diff, and relevant tests, then decide which changes matter for
+  `harbor-works-harness`.
+- Port only relevant upstream fixes/features into Harbor Works-owned branches.
+  Security fixes, protocol compatibility, desktop stability, and provider/tool
+  behavior are usually higher signal than broad upstream product UX changes.
+- Record the review in a dated handoff: upstream version reviewed, accepted
+  changes, rejected/deferred changes, rationale, files touched, and verification.
+- If an upstream change is not relevant to Harbor Works, explicitly leave it
+  behind. That is an accepted outcome, not a merge failure.
 - Keep routine evidence out of root indexes. Use dated handoffs under
   `agent_state/progress/`.
 
-See `docs/harbor-fork.md` for the replay checklist.
+See `docs/harbor-fork.md` for the current upstream-intake checklist.
 
 ### Harbor Auth And Engine Rules
 
@@ -109,7 +135,8 @@ does not print the token.
 
 ### Definition Of Done
 
-- Harbor patch remains narrow and replayable on the recorded upstream tag.
+- Harbor Works changes are product-owned, focused, and documented with upstream
+  intake rationale when inherited Hermes behavior is involved.
 - The active feature state reflects status, scope, evidence, and next action.
 - Relevant local tests pass, including `./init.sh`.
 - Harbor Engine/provider/auth/catalog changes have stage Engine smoke evidence,

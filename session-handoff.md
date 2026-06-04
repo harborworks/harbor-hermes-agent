@@ -7,6 +7,10 @@
 - Branch: `codex/harbor-desktop-v0152`
 - PR: https://github.com/harborworks/harbor-hermes-agent/pull/16
 - Status: PR is open, pushed, locally verified, and ready for review/merge.
+- Product decision: Harbor Works is the source of truth. Upstream Hermes is now
+  reviewed for selective intake each release, not replayed wholesale.
+- Naming decision: use **Harbor Works** for user-facing brand references. The
+  intended harness/repo name is `harbor-works-harness`.
 
 ## Active State
 
@@ -37,7 +41,7 @@ After PR #16 merges:
 
 ```bash
 git fetch origin
-git worktree add ../harbor-hermes-<task-slug> -b codex/<task-slug> origin/main
+git worktree add ../harbor-works-harness-<task-slug> -b codex/<task-slug> origin/main
 ```
 
 Use one branch/worktree/session per independent task. Each session should own

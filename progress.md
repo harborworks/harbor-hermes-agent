@@ -1,4 +1,4 @@
-# Harbor Hermes Progress
+# Harbor Works Harness Progress
 
 This file is a stable index. Routine evidence and handoffs belong in dated
 files under `agent_state/progress/`.
@@ -13,9 +13,13 @@ files under `agent_state/progress/`.
 
 Active feature: `harbor-desktop-v0152`
 
-Bring the Harbor Works desktop fork onto Hermes `0.15.2`, keep the app branded
-as Harbor Works, and prepare PR #16 for merge. After merge, start follow-up work
-in separate worktrees, one branch per task.
+Bring the Harbor Works desktop app onto selected relevant Hermes `0.15.2`
+changes, keep the app branded as Harbor Works, and prepare PR #16 for merge.
+After merge, start follow-up work in separate worktrees, one branch per task.
+
+Strategic decision: Harbor Works Harness is a hard eject from Hermes as product
+source of truth. For each upstream Hermes release, an agent reviews the release
+and ports only changes that matter for `harbor-works-harness`.
 
 ## Startup Checklist
 
