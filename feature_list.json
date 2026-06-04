@@ -10,6 +10,10 @@
     {
       "id": "harbor-skinny-fork",
       "file": "agent_state/features/harbor-skinny-fork.json"
+    },
+    {
+      "id": "harbor-desktop-v0152",
+      "file": "agent_state/features/harbor-desktop-v0152.json"
     }
   ]
 }

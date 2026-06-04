@@ -6,16 +6,16 @@ files under `agent_state/progress/`.
 ## State Files
 
 - Feature index: `feature_list.json`
-- Active feature: `agent_state/features/harbor-skinny-fork.json`
+- Active feature: `agent_state/features/harbor-desktop-v0152.json`
 - Session handoffs: `agent_state/progress/*.md`
 
 ## Current Focus
 
-Active feature: `harbor-skinny-fork`
+Active feature: `harbor-desktop-v0152`
 
-Maintain a minimal Harbor patch series on top of upstream Hermes Agent tags.
-The first Harbor version is `v2026.5.16.harbor1`, based on upstream
-`v2026.5.16`.
+Bring the Harbor Works desktop fork onto Hermes `0.15.2`, keep the app branded
+as Harbor Works, and prepare PR #16 for merge. After merge, start follow-up work
+in separate worktrees, one branch per task.
 
 ## Startup Checklist
 

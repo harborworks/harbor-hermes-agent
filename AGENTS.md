@@ -38,6 +38,21 @@ large upstream flows.
 6. Update feature state and add a dated handoff with evidence, blockers, files
    changed, and next steps.
 
+### Parallel Worktree Protocol
+
+- After a PR merges, update local `main`, then create one worktree and one
+  `codex/<task-slug>` branch per independent task.
+- Each session owns exactly one worktree, branch, and feature/handoff file. Do
+  not edit another active session's `agent_state/features/<id>.json` or dated
+  handoff unless the user asks you to coordinate.
+- Keep root `feature_list.json` and `progress.md` stable. Only touch them when
+  adding a task, changing the active focus, or recording a merge-level state
+  transition.
+- Record session evidence in a dated file under `agent_state/progress/` before
+  yielding, especially when work is meant to be continued by another session.
+- Before opening or pushing a PR, rebase or merge the latest target branch if
+  the branch has drifted and rerun focused verification.
+
 ### Scope Rules
 
 - Work one feature at a time. The active feature is the file named by
