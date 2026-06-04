@@ -85,7 +85,7 @@ export function reportBackendContract(contract: number | undefined): void {
   }
 
   notify({
-    action: { label: 'Update Hermes', onClick: () => void applyUpdates() },
+    action: { label: 'Update Harbor Works', onClick: () => void applyUpdates() },
     durationMs: 0,
     id: SKEW_TOAST_ID,
     kind: 'warning',

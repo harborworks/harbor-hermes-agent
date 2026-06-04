@@ -227,7 +227,7 @@ const BOOT_FAKE_STEP_MS = (() => {
   if (!Number.isFinite(raw) || raw <= 0) return 650
   return Math.max(120, raw)
 })()
-const APP_NAME = 'Hermes'
+const APP_NAME = 'Harbor Works'
 const TITLEBAR_HEIGHT = 34
 const MACOS_TRAFFIC_LIGHTS_HEIGHT = 14
 const WINDOW_BUTTON_POSITION = {
@@ -243,6 +243,8 @@ const WINDOW_BUTTON_POSITION = {
 // non-macOS platforms.
 const NATIVE_OVERLAY_BUTTON_WIDTH = 144
 const APP_ICON_PATHS = [
+  path.join(APP_ROOT, 'assets', 'icon.png'),
+  path.join(unpackedPathFor(APP_ROOT), 'assets', 'icon.png'),
   path.join(APP_ROOT, 'public', 'apple-touch-icon.png'),
   path.join(APP_ROOT, 'dist', 'apple-touch-icon.png'),
   path.join(unpackedPathFor(APP_ROOT), 'dist', 'apple-touch-icon.png')
@@ -384,7 +386,7 @@ function previewFileMetadata(filePath, mimeType) {
 app.setName(APP_NAME)
 app.setAboutPanelOptions({
   applicationName: APP_NAME,
-  copyright: 'Copyright © 2026 Nous Research'
+  copyright: 'Copyright © 2026 Harbor Works'
 })
 
 // Custom scheme for streaming local media (video/audio) into the renderer.
@@ -1318,7 +1320,7 @@ async function applyUpdates(opts = {}) {
       return { ok: true, manual: true, command, hermesRoot: updateRoot }
     }
 
-    emitUpdateProgress({ stage: 'restart', message: 'Handing off to the Hermes updater…', percent: 100 })
+    emitUpdateProgress({ stage: 'restart', message: 'Handing off to the Harbor Works updater…', percent: 100 })
 
     const updateRoot = resolveUpdateRoot()
     const { branch: configuredBranch } = readDesktopUpdateConfig()
@@ -1456,7 +1458,7 @@ async function applyUpdatesPosixInApp(opts = {}) {
     // best effort
   }
 
-  emitUpdateProgress({ stage: 'update', message: 'Updating Hermes (git + dependencies)…', percent: 10 })
+  emitUpdateProgress({ stage: 'update', message: 'Updating Harbor Works (git + dependencies)…', percent: 10 })
   const updated = await runStreamedUpdate(hermes, ['update', '--yes', ...branchArgs], {
     cwd: updateRoot,
     env,
@@ -1476,13 +1478,15 @@ async function applyUpdatesPosixInApp(opts = {}) {
   if (rebuilt.code !== 0) {
     emitUpdateProgress({
       stage: 'error',
-      message: 'Backend updated, but the desktop rebuild failed. Restart Hermes to retry.',
+      message: 'Backend updated, but the desktop rebuild failed. Restart Harbor Works to retry.',
       error: rebuilt.error || 'rebuild-failed'
     })
     return { ok: false, backendUpdated: true, error: 'desktop rebuild failed' }
   }
 
   const rebuiltApp = [
+    path.join(updateRoot, 'apps', 'desktop', 'release', 'mac-arm64', `${APP_NAME}.app`),
+    path.join(updateRoot, 'apps', 'desktop', 'release', 'mac', `${APP_NAME}.app`),
     path.join(updateRoot, 'apps', 'desktop', 'release', 'mac-arm64', 'Hermes.app'),
     path.join(updateRoot, 'apps', 'desktop', 'release', 'mac', 'Hermes.app')
   ].find(directoryExists)
@@ -1493,7 +1497,7 @@ async function applyUpdatesPosixInApp(opts = {}) {
   if (!rebuiltApp || !targetApp) {
     emitUpdateProgress({
       stage: 'done',
-      message: 'Backend updated. Restart Hermes to load the new version.',
+      message: 'Backend updated. Restart Harbor Works to load the new version.',
       percent: 100
     })
     return { ok: true, backendUpdated: true, rebuiltApp: rebuiltApp || null }
@@ -1529,7 +1533,7 @@ fi
   } catch (err) {
     emitUpdateProgress({
       stage: 'done',
-      message: 'Backend + app updated. Restart Hermes to load the new version.',
+      message: 'Backend + app updated. Restart Harbor Works to load the new version.',
       percent: 100
     })
     rememberLog(`[updates] could not write swap script: ${err.message}; rebuilt app at ${rebuiltApp}`)
@@ -1894,7 +1898,7 @@ function resolveHermesBackend(dashboardArgs) {
   //    is a recoverable state the GUI can drive through.
   return {
     kind: 'bootstrap-needed',
-    label: 'Hermes Agent not installed yet; bootstrap required',
+    label: 'Harbor Works runtime not installed yet; bootstrap required',
     command: null,
     args: dashboardArgs,
     bootstrap: true,
@@ -3460,7 +3464,7 @@ function createWindow() {
     height: 800,
     minWidth: 900,
     minHeight: 620,
-    title: 'Hermes',
+    title: APP_NAME,
     // Frameless title bar on every platform so the renderer can paint the
     // "hide sidebar" button (and other left-side titlebar tools) flush with
     // the top edge — matching the macOS layout where the traffic lights sit
@@ -3674,7 +3678,7 @@ ipcMain.handle('hermes:api', async (_event, request) => {
 ipcMain.handle('hermes:notify', (_event, payload) => {
   if (!Notification.isSupported()) return false
   new Notification({
-    title: payload?.title || 'Hermes',
+    title: payload?.title || APP_NAME,
     body: payload?.body || '',
     silent: Boolean(payload?.silent)
   }).show()
@@ -3939,7 +3943,7 @@ function terminalShellEnv() {
   env.COLORTERM = 'truecolor'
   env.LC_CTYPE = env.LC_CTYPE || 'UTF-8'
   env.TERM = 'xterm-256color'
-  env.TERM_PROGRAM = 'Hermes'
+  env.TERM_PROGRAM = APP_NAME
   env.TERM_PROGRAM_VERSION = app.getVersion()
 
   return env

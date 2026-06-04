@@ -14,7 +14,7 @@ import type {
 /**
  * DesktopInstallOverlay
  *
- * Renders the first-launch install progress for Hermes Agent. Mounted always;
+ * Renders the first-launch install progress for Harbor Works. Mounted always;
  * shows itself only when main.cjs reports an in-flight bootstrap (state.active)
  * OR an error from a completed-failed bootstrap (state.error). When the
  * bootstrap finishes successfully the overlay fades out and the rest of the
@@ -272,7 +272,7 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
   if (!shouldShow) return null
 
   // Unsupported-platform branch: macOS/Linux packaged builds hit this when
-  // there's no Hermes Agent installed yet and we can't drive install.sh
+  // there's no Harbor Works runtime installed yet and we can't drive install.sh
   // (no stage protocol equivalent yet). Show a copy-paste install command
   // and the docs URL; user runs it from Terminal and relaunches the app.
   if (state.unsupportedPlatform) {
@@ -281,7 +281,7 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
     return (
       <div className="fixed inset-0 z-[1400] flex items-center justify-center bg-background/90 backdrop-blur-md">
         <div className="w-full max-w-xl rounded-xl border bg-card p-8 shadow-xl">
-          <h2 className="text-2xl font-semibold tracking-tight">Hermes needs a one-time install</h2>
+          <h2 className="text-2xl font-semibold tracking-tight">Harbor Works needs a one-time install</h2>
           <p className="mt-2 text-sm text-muted-foreground">
             Automated first-launch install isn{'\u2019'}t available on {platformLabel} yet. Open Terminal and run the
             command below, then relaunch this app. Subsequent launches will skip this step.
@@ -344,7 +344,7 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
         {/* Header -- always visible, never scrolls */}
         <div className="flex-shrink-0 p-8 pb-4">
           <h2 className="text-2xl font-semibold tracking-tight">
-            {failed ? 'Installation failed' : state.active ? 'Setting up Hermes Agent' : 'Finishing up'}
+            {failed ? 'Installation failed' : state.active ? 'Setting up Harbor Works' : 'Finishing up'}
           </h2>
           <p className="mt-1.5 text-sm text-muted-foreground">
             {failed

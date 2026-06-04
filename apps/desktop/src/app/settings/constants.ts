@@ -300,7 +300,7 @@ export const MODE_OPTIONS: ModeOption[] = [
 ]
 
 export const SEARCH_PLACEHOLDER: Record<'about' | 'config' | 'gateway' | 'keys' | 'mcp' | 'sessions', string> = {
-  about: 'About Hermes Desktop',
+  about: 'About Harbor Works',
   config: 'Search settings...',
   gateway: 'Gateway connection...',
   keys: 'Search API keys...',
