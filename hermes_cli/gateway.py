@@ -7158,6 +7158,8 @@ def _gateway_command_inner(args):
 
             # Start fresh
             print("Starting gateway...")
+            print("No gateway service is installed; running in the foreground.")
+            print("Install a background service with: hermes gateway install")
             run_gateway(verbose=0)
 
     elif subcmd == "status":
