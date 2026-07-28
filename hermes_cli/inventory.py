@@ -184,11 +184,13 @@ def build_models_payload(
         probe_current_custom_provider=probe_current_custom_provider,
         excluded_providers=ctx.excluded_providers or [],
     )
-    rows = _filter_visible_rows(rows)
-
     moa_row = _moa_provider_row(ctx.current_provider)
     if moa_row is not None:
         rows = [moa_row] + [r for r in rows if str(r.get("slug", "")).lower() != "moa"]
+
+    # Harbor visibility runs last so upstream-injected virtual rows (MoA) are
+    # filtered too; otherwise they bypass the Harbor-only provider surface.
+    rows = _filter_visible_rows(rows)
 
     if explicit_only:
         rows = _filter_explicit_provider_rows(rows, ctx)
@@ -454,11 +456,22 @@ def _raw_config_has_enabled_moa_preset() -> bool:
     return any(key in moa for key in legacy_keys) and bool(moa.get("enabled", True))
 
 def _filter_visible_rows(rows: list[dict]) -> list[dict]:
-    """Hide non-Harbor providers from picker payloads in the Harbor fork."""
+    """Hide non-Harbor canonical providers from picker payloads in the Harbor fork.
+
+    User-defined / custom provider rows are always preserved: they exist only
+    because an operator explicitly configured them, they carry no canonical
+    slug, and upstream's aggregator-dedup and custom-endpoint handling both
+    depend on them surviving the payload build. Filtering them out here (the
+    pre-v2026.7.20 behaviour) silently broke those paths.
+    """
     from hermes_cli.models import visible_canonical_providers
 
     visible = {entry.slug for entry in visible_canonical_providers()}
-    return [row for row in rows if row.get("slug") in visible]
+    return [
+        row
+        for row in rows
+        if row.get("is_user_defined") or row.get("slug") in visible
+    ]
 
 
 def _apply_picker_hints(rows: list[dict]) -> None:

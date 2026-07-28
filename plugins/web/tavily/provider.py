@@ -94,7 +94,15 @@ def _resolve_harbor_engine_token() -> str:
 
 def _resolve_tavily_api_key(base_url: str) -> str:
     """Resolve the secret used for Tavily-compatible requests."""
-    api_key = os.getenv("TAVILY_API_KEY", "").strip()
+    # Read through the config-aware env layer first so ~/.hermes/.env and
+    # config-provided keys resolve (upstream invariant), then fall back to
+    # the Harbor Engine token for Harbor-hosted tool endpoints.
+    try:
+        from agent.web_search_provider import get_provider_env
+
+        api_key = (get_provider_env("TAVILY_API_KEY") or "").strip()
+    except Exception:
+        api_key = os.getenv("TAVILY_API_KEY", "").strip()
     if api_key:
         return api_key
 

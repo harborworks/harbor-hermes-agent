@@ -156,23 +156,13 @@ def test_harbor_provider_picker_uses_hw_credentials(monkeypatch, tmp_path):
     ]
 
 
-def test_harbor_model_completion_hides_upstream_aliases(monkeypatch):
-    from hermes_cli.commands import SlashCommandCompleter
-    import hermes_cli.model_switch as ms
-
-    monkeypatch.delenv("HARBOR_SHOW_ALL_PROVIDERS", raising=False)
-    monkeypatch.setattr(ms, "_ensure_direct_aliases", lambda: None)
-    monkeypatch.setattr(ms, "DIRECT_ALIASES", {})
-
-    completions = list(SlashCommandCompleter()._model_completions("", ""))
-    names = [completion.text for completion in completions]
-    meta = {completion.text: completion.display_meta_text for completion in completions}
-
-    assert names == ["harbor", "claude-sonnet-4.6", "claude-opus-4.7"]
-    assert meta["harbor"] == "Harbor Engine"
-    assert "codex" not in names
-    assert "deepseek" not in names
-    assert "kimi" not in names
+# NOTE (v2026.7.20 re-base): upstream removed the inline `/model ` completion
+# path entirely (SlashCommandCompleter._model_completions no longer exists;
+# `/model ` now opens the picker instead of autocompleting). The Harbor patch
+# that suppressed upstream aliases there is therefore obsolete and was dropped.
+# Harbor-only provider visibility is still enforced and covered by
+# test_harbor_provider_surfaces_hide_other_providers below, which exercises the
+# real surfaces (hermes model picker + inventory payload).
 
 
 def test_resolve_runtime_provider_harbor(monkeypatch, tmp_path):
