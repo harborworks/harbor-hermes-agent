@@ -31,7 +31,7 @@ concurrency:
 jobs:
   diff:
     name: package-lock.json semantic diff
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, moviebox, harbor-hermes-agent]
     timeout-minutes: 5
     steps:
       - name: Checkout code
