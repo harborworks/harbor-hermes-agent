@@ -73,7 +73,8 @@
     "Added optional trigram FTS fallback so old SQLite builds keep the primary SQLite session store instead of falling back to JSONL.",
     "Added a manual gateway restart message clarifying that no installed service means restart runs the gateway in the foreground.",
     ".venv/bin/python -m pytest tests/test_hermes_state.py::TestSessionLifecycle::test_sqlite_store_works_without_trigram_tokenizer tests/test_hermes_state.py::TestCJKSearchFallback::test_cjk_trigram_preserves_boolean_operators tests/test_hermes_state.py::TestCJKSearchFallback::test_cjk_or_combined_short_tokens_returns_results tests/test_hermes_state.py::TestCJKSearchFallback::test_mixed_cjk_english_query -q passed on 2026-05-27.",
-    "./init.sh passed on 2026-05-27 after SQLite trigram fallback changes: 55 passed."
+    "./init.sh passed on 2026-05-27 after SQLite trigram fallback changes: 55 passed.",
+    "agent_state/progress/2026-09-09-moviebox-ci.md \u2014 independent workflow migration; provider/release status unchanged"
   ],
   "next_action": "Tag v2026.5.16.harbor3 after merge, then update harbor-agents installer to consume it."
 }
